@@ -9,5 +9,5 @@ Before writing any code, you MUST review the context files located in `.context/
 4. **Testing:** All new code must be accompanied by tests as defined in `.context/06_testing/`.
 
 # Tech Stack
-- We are using: [Insert Stack, e.g., Next.js, Python, Solidity].
+- We are using: Solidity, Foundry.
 - See `.context/04_tech_stack/` for specific idioms.
