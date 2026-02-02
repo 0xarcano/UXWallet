@@ -1,0 +1,13 @@
+# .cursorrules
+
+Before writing any code, you MUST review the context files located in `.context/` to understant info related with the current project.
+
+# Priority Rules
+1. **Architecture:** Follow the patterns defined in `.context/02_architecture/`.
+2. **Style:** Adhere strictly to `.context/03_standards/coding_style.md`.
+3. **Security:** Review `.context/05_security/` before writing sensitive logic.
+4. **Testing:** All new code must be accompanied by tests as defined in `.context/06_testing/`.
+
+# Tech Stack
+- We are using: [Insert Stack, e.g., Next.js, Python, Solidity].
+- See `.context/04_tech_stack/` for specific idioms.
