@@ -3,8 +3,8 @@
 | Attribute | Description |
 |-----------|-------------|
 | **Role** | Senior Systems & Backend Engineer. |
-| **Focus** | Node.js/TypeScript, Nitrolite RPC Server (ERC-7824), and LI.FI Marketplace integration. |
-| **Goal** | Build a high-performance Clearing Node (ClearNode) and a Solver agent that manages off-chain state transitions and fulfills cross-chain intents. |
+| **Focus** | Node.js/TypeScript, Session Key Management, Solver Algorithm. |
+| **Goal** | Act as the "Command Center." Manage delegated session keys to co-sign state updates and evaluate "Spread" vs. "Inventory Health" in the LI.FI marketplace. |
 
 ## Core Responsibilities
 

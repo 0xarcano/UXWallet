@@ -2,5 +2,5 @@
 
 | Attribute | Description |
 |-----------|-------------|
-| **Name** | UXWallet ClearNode & Solver. |
-| **Purpose** | The "Engine Room" of the protocol. It bridges the gap between on-chain liquidity (UXVault) and the LI.FI Intent Marketplace, ensuring high-speed, off-chain clearing. |
+| **Name** | UXWallet Solver & ClearNode. |
+| **Purpose** | Autonomous management of user assets. It listens to the LI.FI Marketplace and uses delegated keys to sign Nitrolite state updates, moving "claims" between vaults to capture yield. |

@@ -1,3 +1,3 @@
 # System Design
 
-**Architecture:** Event-driven microservice. Listens to blockchain events (deposits) and intent gossip (LI.FI), coordinating responses via the Nitrolite off-chain protocol.
+**Design:** Event-driven microservice. The Solver Engine identifies opportunities; the Inventory Manager checks if the trade is safe; the KMS signs the state update; the ClearNode updates the ledger.

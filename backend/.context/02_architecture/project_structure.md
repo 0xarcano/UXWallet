@@ -3,8 +3,8 @@
 ```text
 backend/
 ├── src/
-│   ├── services/   # LifiListener, NitroliteService, SolverEngine
-│   ├── rpc/        # Nitrolite RPC handlers
-│   ├── db/         # Database models and migrations
+│   ├── services/   # SolverEngine (Profit/Health checks), Rebalancer
+│   ├── kms/        # Session key storage and signing logic
+│   ├── rpc/        # Nitrolite & State Persistence
 │   └── utils/      # Signature verification, math
 ```
