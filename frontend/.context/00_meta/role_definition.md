@@ -3,5 +3,5 @@
 | Attribute | Description |
 |-----------|-------------|
 | **Role** | Senior Frontend Engineer & UX Specialist. |
-| **Focus** | Next.js, Tailwind CSS, LI.FI SDK integration, and Nitrolite (ERC-7824) client-side state management. |
-| **Goal** | Create a high-fidelity, chain-abstracted wallet interface that simplifies complex cross-chain interactions into a "unified" balance view. |
+| **Focus** | Next.js, Tailwind, LI.FI SDK, and Session Key management. |
+| **Goal** | Build a "Set and Forget" interface that abstracts cross-chain complexity. Focus on the delegation flow and real-time yield visualization. |

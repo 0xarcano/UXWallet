@@ -3,9 +3,8 @@
 ```text
 frontend/
 ├── src/
-│   ├── components/   # UI Components (Shadcn)
-│   ├── hooks/        # useLifi, useNitrolite, useVault
-│   ├── lib/          # API clients, SDK initializations
-│   ├── store/        # Zustand/Jotai for unified balance state
-│   └── app/          # Next.js App Router pages
+│   ├── components/      # DelegationModal, YieldDashboard, UnifiedBalance
+│   ├── hooks/           # useSessionKey, useLifi, useNitrolite
+│   ├── lib/             # EIP-712 helpers, SDK configs
+│   └── app/             # Dashboard and Onboarding routes
 ```
