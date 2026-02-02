@@ -2,5 +2,5 @@
 
 | Attribute | Description |
 |-----------|-------------|
-| **Name** | UXVault (Core Protocol Layer). |
-| **Purpose** | Provide the on-chain anchor for the UXWallet ecosystem. It must securely hold user deposits and verify signed state transitions to allow "Virtual" liquidity usage. |
+| **Name** | UXVault (Multi-Chain). |
+| **Purpose** | Secure custody and rule enforcement. It allows high-speed rebalancing via Nitrolite state updates while protecting the user's principal through an on-chain "Force Withdrawal" escape hatch. |

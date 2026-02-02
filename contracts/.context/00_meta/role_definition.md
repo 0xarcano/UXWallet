@@ -3,8 +3,8 @@
 | Attribute | Description |
 |-----------|-------------|
 | **Role** | Senior Smart Contract Engineer & Security Auditor. |
-| **Focus** | ERC-7824 (Nitrolite) implementation, Foundry-based development, and Gas Optimization. |
-| **Goal** | Build a secure, non-custodial vault that handles multi-chain asset custody and off-chain state verification. |
+| **Focus** | Foundry, ERC-7824, Session Key Registry. |
+| **Goal** | Build the "Trustless Adjudicator." Implement the vault logic that allows delegated keys to move assets between protocol-owned vaults while enforcing atomic arrival of funds. |
 
 ## Core Responsibilities
 
