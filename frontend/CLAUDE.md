@@ -1,6 +1,6 @@
 # .cursorrules
 
-Before writing any code, you MUST review the context files located in `.context/` to understant info related with the current project.
+Before writing any code, you MUST review the context files located in `../.context/` to understand whole the project context and `.context/` to understant info related with the specific subproject.
 
 # Priority Rules
 1. **Architecture:** Follow the patterns defined in `.context/02_architecture/`.
