@@ -8,8 +8,8 @@ UXWallet is the real Web3 wallet, fueled by a novel **Liquidity protocol** that 
 
 ### **The Value Proposition**
 
-* **For the User:** "Set and Forget." A one-time delegation and get a real web3 wallet; UX-centric, non-custodial, cross-chain, bear-yielding plus gasless transactions within the Yellow L3.  
-* **For the Protocol:** Captures the "Spread" in the LI.FI Marketplace by acting as a Just-In-Time (JIT) solver using aggregated community liquidity.  
+* **For the User:** "Set and Forget." A one-time delegation and get a real web3 wallet; UX-centric, non-custodial, cross-chain, bear-yielding plus gasless transactions within the Yellow L3.
+* **For the Protocol:** Captures the "Spread" in the LI.FI Marketplace by acting as a Just-In-Time (JIT) solver using aggregated community liquidity.
 * **The Innovation:** The integration of **LI.FI (ERC-7683)** for intent-based on-boarding and **Yellow Network (ERC-7824)** for millisecond off-chain settlement.
 
 ## 
