@@ -4,7 +4,7 @@
 
 ## **1\. Vision & Product Perspective**
 
-UXWallet is the real Web3 wallet, unified liquidity and seamless crosschain transactions in one step are the heart of the user experience plus bear-yielding fueled by a novel **Layer-3 liquidity protocol**. It transforms fragmented liquidity into a UX-centric wallet with a single, virtualized **Unified Balance** that is chain-agnostic, gasless, and yield-bearing.
+UXWallet is the real Web3 wallet, fueled by a novel **Liquidity protocol** that transforms fragmented liquidity into a UX-centric wallet with a single, virtualized **Unified Balance** that is chain-agnostic, gasless and yield-bearing.
 
 ### **The Value Proposition**
 
