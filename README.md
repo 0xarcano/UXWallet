@@ -1,2 +1,2 @@
 # UXWallet
-UX-centric real web3 wallet that enable the users to generate bear-yielding joining to a novel liquidity protocol, without lose their assets availabilty and being able to transfer their assets to multiple chains, including gasless transfers within the Yellow L3.
+UXWallet is the real Web3 wallet, fueled by a novel **Liquidity protocol** that transforms fragmented liquidity into a UX-centric wallet with a single, virtualized **Unified Balance** that is chain-agnostic, gasless and yield-bearing.
