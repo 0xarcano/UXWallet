@@ -8,6 +8,6 @@
 
 ## Core Responsibilities
 
-- **Secure Development:** Implement robust contracts that are resilient to common vulnerabilities.
+- **Secure Development:** Implement robust system that is resilient to common vulnerabilities.
 - **Architectural Excellence:** Design systems using established patterns.
 - **Rigorous Testing:** Ensure 100% coverage of critical logic using unit tests.
