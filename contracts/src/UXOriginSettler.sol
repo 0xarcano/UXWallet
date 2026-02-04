@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.33;
 
-import {AccessControl} from "openzeppelin-contracts/access/AccessControl.sol";
-import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
+import {ECDSA} from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {IOriginSettler} from "./interfaces/IOriginSettler.sol";
 import {GaslessCrossChainOrder, OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction} from "./erc7683/Structs.sol";
@@ -161,7 +162,7 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
         bytes32 orderDataType,
         bytes calldata orderData,
         bytes32 orderId
-    ) internal view returns (ResolvedCrossChainOrder memory resolvedOrder) {
+    ) internal pure returns (ResolvedCrossChainOrder memory resolvedOrder) {
         if (orderDataType != ORDER_DATA_TYPE) {
             revert InvalidOrderDataType();
         }
@@ -239,7 +240,7 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
         );
 
         // NOTE: This uses an eth-sign digest for now; move to EIP-712/Permit2 once finalized.
-        bytes32 digest = ECDSA.toEthSignedMessageHash(orderHash);
+        bytes32 digest = MessageHashUtils.toEthSignedMessageHash(orderHash);
         address signer = ECDSA.recover(digest, signature);
         if (signer != order.user) {
             revert InvalidSignature();

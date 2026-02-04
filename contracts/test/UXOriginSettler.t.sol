@@ -27,7 +27,7 @@ contract UXOriginSettlerTest is Test {
         assertTrue(orderId != bytes32(0));
     }
 
-    function testResolveBuildsFillInstructions() public {
+    function testResolveBuildsFillInstructions() public view {
         UXOriginSettler.UXDepositOrder memory uxOrder = _buildOrder(address(this));
         OnchainCrossChainOrder memory order = OnchainCrossChainOrder({
             fillDeadline: uint32(block.timestamp + 2 days),
@@ -49,7 +49,7 @@ contract UXOriginSettlerTest is Test {
         assertEq(orderId, expectedOrderId);
     }
 
-    function _buildOrder(address user) internal view returns (UXOriginSettler.UXDepositOrder memory uxOrder) {
+    function _buildOrder(address user) internal pure returns (UXOriginSettler.UXDepositOrder memory uxOrder) {
         Output[] memory outputs = new Output[](2);
         outputs[0] = Output({
             token: bytes32(uint256(uint160(address(0xBEEF)))),

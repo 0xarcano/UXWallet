@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.33;
 
-import {AccessControl} from "openzeppelin-contracts/access/AccessControl.sol";
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 contract LifiAdapter is AccessControl {
     bytes32 public constant SETTLER_ROLE = keccak256("SETTLER_ROLE");
