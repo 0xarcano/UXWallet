@@ -1,4 +1,4 @@
-# UXWallet Frontend — Product Requirements Document
+# UXWallet Protocol Frontend — Product Requirements Document
 
 **Version:** 1.0
 **Last Updated:** 2026-02-03
@@ -26,23 +26,38 @@
 
 ## 1. Executive Summary
 
-UXWallet is a "Set and Forget" cross-chain wallet targeting crypto newcomers who want a real Web3 wallet without the complexity. The frontend serves as an **Aggregated Liquidity Orchestrator UI** that hides all bridging, gas management, and chain-switching behind a single delegation signature, presenting the user with a unified, yield-bearing balance.
+UXWallet is the state-of-the-art UX-focused web3 wallet, unify your fragmented liquidity and start generating yield automatically keeping assets available for the day-to-day transactions anytime.
 
-**Core value proposition:** One-time delegation gives users a UX-centric, non-custodial, cross-chain, yield-bearing wallet with gasless transactions within the Yellow L3.
+The frontend serves as an Non-custodial Aggregated Liquidity Orchestrator UI that keeps security of bear-yielding generation mechanism behind a single delegation signature and hides complexity of all bridging, gas management, and chain-switching behind one-step signed transaction, presenting the user with a unified, yield-bearing balance always taking care to make the transactions simple and atomic (in one-step).
 
-**How it works:**
+## Users target:
+Web3 medium and advanced users.
+
+## Solution.
+A bear-yielding non-custodial wallet that abstracts the complexity of the most common cross-chain transactions to give a true Web3 experience to the users while generate yield using a novel Non-custodial Liquidity Layer as yield engine.
+
+## Core Innovation.
+Convert the most common used tool in Web3, the wallet, to a friction-less and non-custodial entry-point to a novel Non-custodial Aggregated Liquidity Protocol that generates yield for the user without compromising assets custody.
+
+## The Aggregated Liquidity Protocol.
+A Just-In-Time Solver Bot running at off-chain speed using Yellow Technology for the LI.FI's marketplace plus the Community Liquidity Pool (user's liquidity deposited across multiple chains in the Yellow Margin Accounts) working together to generate the needed yield to keep all the protocol working as an efficient "economic flywheel".
+
+## Wallet.
+Non-custodial, one-step liquidity unification,  automated bear-yielding, one-step gasless Yellow L3 transactions, one-step cross-chain transactions with the best fee rates on the market.
+
+## How it works.
 
 1. **Inbound Gateway (LI.FI / ERC-7683):** Users "Unify" fragmented assets from multiple chains into UXWallet Vaults via intent-based deposits.
 2. **Settlement Engine (Yellow / ERC-7824):** Asset movement is virtualized through Nitrolite State Channels, co-signed by a Persistent Session Key.
 3. **Hybrid Exit Strategy:** Withdrawals from chains with empty local vaults are sponsored by the protocol treasury via LI.FI, guaranteeing a "Fast Exit."
 
-**MVP Chains:** Yellow L3 + Base.
+**MVP Chains:** Yellow L3 + Ethereum + Base.
 
 ---
 
 ## 2. Problem Statement
 
-Web3 wallets today impose unacceptable friction on users, especially newcomers. UXWallet addresses six core pain points:
+Web3 wallets today impose unacceptable friction on users. UXWallet addresses six core pain points:
 
 | # | Pain Point | Impact | UXWallet Solution |
 |---|-----------|--------|-------------------|
@@ -55,32 +70,10 @@ Web3 wallets today impose unacceptable friction on users, especially newcomers. 
 
 ---
 
-## 3. Success Metrics
-
-### Primary KPIs (TVL & Yield Focused)
-
-| Metric | Target | Measurement Method |
-|--------|--------|--------------------|
-| **Total Value Locked (TVL)** | $500K within 6 months post-launch | Sum of all assets in UXVault contracts across supported chains |
-| **Average Yield per User** | 3–5% APY | `(total_solver_profit * 0.5) / total_user_deposits` annualized |
-| **Solver Profit Margin** | > 0.1% per fulfilled intent | `(spread_captured - rebalancing_cost) / intent_value` |
-
-### Secondary KPIs
-
-| Metric | Target | Measurement Method |
-|--------|--------|--------------------|
-| **Delegation Completion Rate** | > 80% of connected wallets | `delegations_completed / wallets_connected` |
-| **Unification Success Rate** | > 95% | `successful_unifications / total_unification_attempts` |
-| **Time to First Unified Balance** | < 3 minutes from wallet connect | Timestamp delta: `wallet_connected → unified_balance_visible` |
-| **Monthly Active Users (MAU)** | 1,000 within 6 months | Unique wallets with at least one state channel interaction per month |
-| **P2P Transfer Volume** | $100K/month within 6 months | Sum of all `send_transfer` amounts per month |
-| **Hybrid Withdrawal Success Rate** | > 98% | `successful_hybrid_exits / total_hybrid_exit_attempts` |
-
----
 
 ## 4. User Personas
 
-### Primary Persona: "Alex" — The Crypto Newcomer
+### Primary Persona: "Alex" — The medium experience user
 
 | Attribute | Detail |
 |-----------|--------|
@@ -164,14 +157,29 @@ Web3 wallets today impose unacceptable friction on users, especially newcomers. 
 
 **Acceptance Criteria:**
 
-- [ ] The withdrawal flow allows the user to select any supported target chain
+- [ ] The withdrawal flow does not allow the user to select any supported target chain.
+- [ ] If the target chain is different than the original chain (the chain where the user deposited the funds from), the transaction change to be handled as a P2P Cross-chain Transfers.
+- [ ] If the local vault is empty, a Hybrid Withdrawal is triggered automatically
 - [ ] If the local vault has sufficient liquidity, withdrawal is processed directly (instant via state channel close)
 - [ ] If the local vault is empty, a Hybrid Withdrawal is triggered automatically
 - [ ] The user sees a clear indicator: "Direct Exit" vs. "Sponsored Exit (Hybrid)"
 - [ ] Hybrid Exit shows the estimated additional time and confirms no extra fee to the user
 - [ ] The protocol treasury sponsors the LI.FI bridge fee transparently
 
-### US-05: Gasless P2P Transfers
+### US-05: Gasless P2P Yellow L3 Transfers
+
+> As a user, I want to send funds to a friend within the Yellow L3 instantly without worrying about gas fees.
+
+**Acceptance Criteria:**
+
+- [ ] A "Send" action accepts a recipient address (or ENS in future) and amount
+- [ ] Transfer executes off-chain via ClearNode `send_transfer` — zero gas cost
+- [ ] Transfer confirmation appears within milliseconds
+- [ ] Recipient sees their balance update in real-time (`bu` notification)
+- [ ] Clear feedback: "Transfer complete — 0 gas fees"
+- [ ] Error handling for insufficient balance, invalid address, or ClearNode unavailability
+
+### US-05: P2P Cross-chain Transfers
 
 > As a user, I want to send funds to a friend within the Yellow L3 instantly without worrying about gas fees.
 
