@@ -20,6 +20,7 @@ Minimal Rust adapter that connects UXWallet on-chain intents to LI.FI routing.
 1. `GET /health`
 1. `POST /lifi/quote` returns the raw LI.FI quote JSON.
 1. `POST /intent/build` returns ABI-encoded `orderData` and `onchainOrder` bytes.
+1. `POST /intent/calldata` returns `to` + calldata for `UXOriginSettler.open(...)`.
 
 ## Request examples
 
@@ -67,7 +68,8 @@ Minimal Rust adapter that connects UXWallet on-chain intents to LI.FI routing.
 
 1. `LIFI_API_URL` defaults to `https://li.quest/v1`. citeturn0search1
 2. `LIFI_API_KEY` optional. Do not expose client-side. citeturn0search1
-3. `PORT` defaults to `8080`.
+3. `UX_ORIGIN_SETTLER` required for `/intent/calldata`.
+4. `PORT` defaults to `8080`.
 
 ## Local dev
 

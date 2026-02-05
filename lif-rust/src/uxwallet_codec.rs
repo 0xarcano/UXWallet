@@ -28,6 +28,10 @@ sol! {
         bytes32 orderDataType;
         bytes orderData;
     }
+
+    interface IUXOriginSettler {
+        function open(OnchainCrossChainOrder order) external returns (bytes32);
+    }
 }
 
 pub fn build_onchain_order(payload: BuildIntentRequest) -> Result<BuildIntentResponse, ServiceError> {
@@ -84,13 +88,8 @@ pub fn build_onchain_order(payload: BuildIntentRequest) -> Result<BuildIntentRes
 
     let order_data_type_hash = resolve_order_data_type(&order_data_type)?;
 
-    let onchain = OnchainCrossChainOrder {
-        fillDeadline: payload.fill_deadline,
-        orderDataType: order_data_type_hash,
-        orderData: order_data.clone().into(),
-    };
-
-    let onchain_encoded = onchain.abi_encode();
+    let (onchain, onchain_encoded) =
+        build_onchain_order_struct(payload.fill_deadline, order_data_type_hash, order_data.clone());
 
     Ok(BuildIntentResponse {
         order_data_type: format!("0x{}", hex::encode(order_data_type_hash)),
@@ -101,6 +100,79 @@ pub fn build_onchain_order(payload: BuildIntentRequest) -> Result<BuildIntentRes
             order_data: format!("0x{}", hex::encode(onchain_encoded)),
         },
     })
+}
+
+pub fn build_open_calldata(
+    payload: BuildIntentRequest,
+) -> Result<(BuildIntentResponse, String), ServiceError> {
+    let order_data_type = payload
+        .order_data_type
+        .unwrap_or_else(|| "UXDepositOrder".to_string());
+
+    let user = parse_address(&payload.order_data.user)?;
+    let input_token = parse_address(&payload.order_data.input_token)?;
+    let input_amount = parse_u256(&payload.order_data.input_amount)?;
+
+    if payload.order_data.outputs.is_empty() {
+        return Err(ServiceError::BadRequest("outputs must not be empty".to_string()));
+    }
+    if payload.order_data.outputs.len() != payload.order_data.destination_call_data.len() {
+        return Err(ServiceError::BadRequest(
+            "destinationCallData length must match outputs length".to_string(),
+        ));
+    }
+
+    let mut outputs = Vec::with_capacity(payload.order_data.outputs.len());
+    for output in payload.order_data.outputs {
+        let token = parse_b256_or_address(&output.token)?;
+        let recipient = parse_b256_or_address(&output.recipient)?;
+        let amount = parse_u256(&output.amount)?;
+        outputs.push(Output {
+            token,
+            amount,
+            recipient,
+            chainId: U256::from(output.chain_id),
+        });
+    }
+
+    let destination_settler = parse_b256_or_address(&payload.order_data.destination_settler)?;
+    let mut destination_call_data = Vec::with_capacity(payload.order_data.destination_call_data.len());
+    for data in payload.order_data.destination_call_data {
+        destination_call_data.push(parse_bytes(&data)?);
+    }
+
+    let lifi_calldata = parse_bytes(&payload.order_data.lifi_calldata)?;
+
+    let ux_order = UXDepositOrder {
+        user,
+        inputToken: input_token,
+        inputAmount: input_amount,
+        outputs,
+        destinationSettler: destination_settler,
+        destinationCallData: destination_call_data,
+        nonce: U256::from(payload.order_data.nonce),
+        lifiCalldata: lifi_calldata,
+    };
+
+    let order_data = ux_order.abi_encode();
+    let order_data_type_hash = resolve_order_data_type(&order_data_type)?;
+    let (onchain, onchain_encoded) =
+        build_onchain_order_struct(payload.fill_deadline, order_data_type_hash, order_data.clone());
+
+    let call = IUXOriginSettler::openCall { order: onchain };
+    let calldata = call.abi_encode();
+
+    let response = BuildIntentResponse {
+        order_data_type: format!("0x{}", hex::encode(order_data_type_hash)),
+        order_data: format!("0x{}", hex::encode(order_data)),
+        onchain_order: OnchainCrossChainOrderPayload {
+            fill_deadline: payload.fill_deadline,
+            order_data_type: format!("0x{}", hex::encode(order_data_type_hash)),
+            order_data: format!("0x{}", hex::encode(onchain_encoded)),
+        },
+    };
+
+    Ok((response, format!("0x{}", hex::encode(calldata))))
 }
 
 fn parse_address(value: &str) -> Result<Address, ServiceError> {
@@ -156,4 +228,18 @@ fn resolve_order_data_type(value: &str) -> Result<B256, ServiceError> {
     }
 
     Ok(keccak256(value.as_bytes()))
+}
+
+fn build_onchain_order_struct(
+    fill_deadline: u32,
+    order_data_type_hash: B256,
+    order_data: Vec<u8>,
+) -> (OnchainCrossChainOrder, Vec<u8>) {
+    let onchain = OnchainCrossChainOrder {
+        fillDeadline: fill_deadline,
+        orderDataType: order_data_type_hash,
+        orderData: order_data.into(),
+    };
+    let encoded = onchain.abi_encode();
+    (onchain, encoded)
 }

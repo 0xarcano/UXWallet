@@ -77,6 +77,18 @@ pub struct BuildIntentResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildCalldataResponse {
+    pub to: String,
+    pub data: String,
+    #[serde(rename = "orderDataType")]
+    pub order_data_type: String,
+    #[serde(rename = "orderData")]
+    pub order_data: String,
+    #[serde(rename = "onchainOrder")]
+    pub onchain_order: OnchainCrossChainOrderPayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
 }
