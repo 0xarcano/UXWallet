@@ -4,10 +4,10 @@ Minimal Rust adapter that connects UXWallet on-chain intents to LI.FI routing.
 
 ## What this is
 
-`lif-rust` is a thin backend service that:
-1. Calls LI.FI REST APIs to fetch a quote for a multi-chain "Unify" intent.
-2. Builds ABI-encoded `UXDepositOrder` + `OnchainCrossChainOrder` payloads that match the contracts in `contracts/src/UXOriginSettler.sol`.
-3. Returns the encoded bytes so your signer can call `UXOriginSettler.open(...)`.
+`lif-rust` is a tiny backend that does three things:
+1. Fetch a LI.FI quote.
+2. Build the ERC-7683 order bytes for `UXOriginSettler`.
+3. Return calldata so the wallet can send the tx.
 
 ## LI.FI API basics
 
@@ -15,12 +15,19 @@ Minimal Rust adapter that connects UXWallet on-chain intents to LI.FI routing.
 2. API keys are optional and only needed for higher rate limits. citeturn0search1
 3. If you use a key, send it in the `x-lifi-api-key` header and keep it server-side only. citeturn0search1
 
+## Minimal workflow
+
+1. `POST /lifi/quote` to get a route.
+2. `POST /intent/build` to build the ERC-7683 order bytes.
+3. `POST /intent/calldata` to get `{ to, data }` for `UXOriginSettler.open(...)`.
+4. Wallet signs + sends the transaction.
+
 ## Service endpoints
 
 1. `GET /health`
-1. `POST /lifi/quote` returns the raw LI.FI quote JSON.
-1. `POST /intent/build` returns ABI-encoded `orderData` and `onchainOrder` bytes.
-1. `POST /intent/calldata` returns `to` + calldata for `UXOriginSettler.open(...)`.
+1. `POST /lifi/quote`
+1. `POST /intent/build`
+1. `POST /intent/calldata`
 
 ## Request examples
 
