@@ -15,3 +15,4 @@
 | **Hybrid Exit / Sponsored Exit** | Withdrawal mode where the protocol treasury sponsors LI.FI bridge fees when the local vault lacks sufficient liquidity, providing a "Fast Exit Guarantee". |
 | **JIT Solver** | Just-In-Time solver bot running at off-chain speed using Yellow technology to fulfill LI.FI marketplace orders and generate yield. |
 | **Execution Guard** | Safety layer ensuring vault funds are only released when a corresponding asset is confirmed arriving on another protocol-owned vault (atomic intent behavior), or the owner explicitly signs an on-chain withdrawal. |
+| **lif-rust Service** | Rust microservice providing REST API for LI.FI integration; handles quote fetching, ERC-7683 order encoding, and calldata generation. Used by both frontend and backend. |

@@ -73,21 +73,24 @@ A smart contract safety layer ensuring vault funds are only released when:
 If the backend/ClearNode is unavailable, users can present their last signed state update to the on-chain **Adjudicator** contract to claim funds.
  
 ## **5. Sub-Project Integration Guidelines**
- 
+
 ### **Communication Matrix**
- 
+
 | From | To | Method |
 | :---- | :---- | :---- |
 | **Frontend** | **Backend / ClearNode** | WebSocket (e.g., `bu`) for real-time updates; RPC for state queries/handshake. |
-| **Frontend** | **LI.FI** | LI.FI SDK for ERC-7683 intents + status tracking hooks for progress UX. |
+| **Frontend** | **lif-rust** | REST API for LI.FI quote fetching and ERC-7683 order encoding (used during Unify/Withdraw flows). |
+| **Backend** | **lif-rust** | REST API for LI.FI routing and intent order construction when JIT solver needs to fulfill marketplace orders. |
 | **Backend** | **Contracts** | Monitor events (deposits/withdrawals) & submit checkpoints/state where required. |
 | **Contracts** | **Frontend/Backend** | Shared ABIs and contract addresses (deployment artifacts). |
+| **lif-rust** | **LI.FI API** | External HTTP requests to LI.FI REST API for routing quotes and intent data. |
  
 ### **Integration Standards**
- 
-1. **Shared environment**: maintain a root `.env.example` to synchronize chain IDs, RPC URLs, and API keys across folders.
-2. **ABI synchronization**: after contract deployment, export ABIs to `frontend/src/abi` and `backend/src/abi`.
+
+1. **Shared environment**: maintain a root `.env.example` to synchronize chain IDs, RPC URLs, and API keys across folders (including lif-rust).
+2. **ABI synchronization**: after contract deployment, export ABIs to `frontend/src/abi`, `backend/src/abi`, and use in lif-rust for calldata encoding.
 3. **State persistence**: backend should persist the latest signed Nitrolite state (e.g., PostgreSQL) to reduce user friction and support safe recovery flows.
+4. **lif-rust service**: microservice for LI.FI API integration, providing REST endpoints for quote fetching and ERC-7683 order encoding; deployed independently, consumed by both frontend and backend.
  
 ## **6. MVP Phasing (PRD-aligned)**
  

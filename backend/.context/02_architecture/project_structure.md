@@ -30,7 +30,8 @@ backend/
 
 ### Layer 1: Inbound Gateway (LI.FI / ERC-7683)
 - `services/solver/`: Listens to LI.FI marketplace, evaluates intents, fulfills orders.
-- `integrations/lifi/`: LI.FI SDK wrapper for ERC-7683 intents.
+- `integrations/lifi/`: Client wrapper to communicate with lif-rust microservice for quote fetching and order encoding.
+- **lif-rust microservice** (separate project): Rust-based REST API handling LI.FI API integration and ERC-7683 order encoding.
 
 ### Layer 2: Settlement Engine (Yellow / ERC-7824)
 - `services/clearnode/`: Co-signs Nitrolite state updates, provides real-time updates.

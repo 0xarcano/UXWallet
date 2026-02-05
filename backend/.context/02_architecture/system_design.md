@@ -26,11 +26,13 @@ UXWallet backend operates within a **3-layer technical architecture** to provide
 4. **ClearNode**: Updates the Virtual Ledger (off-chain); provides RPC and WebSocket (`bu`) for real-time balance updates.
 5. **Rebalancer**: Coordinates cross-chain liquidity movement when needed (e.g., Hybrid Exits).
 6. **State Persistence**: Stores latest signed Nitrolite state in PostgreSQL to support safe recovery flows.
+7. **lif-rust Service**: Rust-based microservice providing REST API for LI.FI integration; handles quote fetching, ERC-7683 order encoding, and calldata generation for UXOriginSettler contract interactions.
 
 ## Communication Matrix
 
 | From | To | Method |
 |------|-----|--------|
 | **Backend** | **Frontend / ClearNode** | WebSocket (`bu`) for real-time updates; RPC for state queries/handshake. |
-| **Backend** | **LI.FI** | LI.FI SDK for ERC-7683 intents + status tracking. |
+| **Backend** | **lif-rust** | REST API (POST /lifi/quote, POST /intent/build, POST /intent/calldata). |
 | **Backend** | **Contracts** | Monitor events (deposits/withdrawals) & submit checkpoints/state where required. |
+| **lif-rust** | **LI.FI API** | External HTTPS requests for routing and quote data. |

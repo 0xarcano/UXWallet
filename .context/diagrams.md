@@ -19,19 +19,25 @@ flowchart TB
         UI --> Unify[Unify / Send / Withdraw]
     end
 
+    subgraph Microservices["Microservices Layer"]
+        LIFRUST[lif-rust\nRust REST API]
+    end
+
     subgraph External["External Services"]
-        LIFI[LI.FI SDK\nERC-7683 Intents]
+        LIFIAPI[LI.FI API\nERC-7683 Intents]
     end
 
     subgraph Backend["Backend / ClearNode"]
         WS[WebSocket\n e.g. bu events]
         RPC[RPC / State Queries]
         KMS[Session Key Storage]
+        Solver[JIT Solver Engine]
     end
 
     subgraph Contracts["On-Chain (MVP: Yellow L3, Ethereum, Base)"]
         Vault["UXVault(s)"]
         Adjudicator[Adjudicator]
+        OriginSettler[UXOriginSettler]
         Vault --> Adjudicator
     end
 
@@ -42,8 +48,11 @@ flowchart TB
     Wallet <-->|Connect & Sign EIP-712| UI
     UI <-->|Real-time balance, progress| WS
     UI <-->|Handshake, state| RPC
-    UI -->|"Intent (Unify, Exit)"| LIFI
-    LIFI <-->|Route & Fulfill| Vault
+    UI -->|"REST: /lifi/quote, /intent/calldata"| LIFRUST
+    Solver -->|"REST: /lifi/quote, /intent/build"| LIFRUST
+    LIFRUST -->|"HTTPS: routing quotes"| LIFIAPI
+    UI -->|"Call open() with calldata"| OriginSettler
+    OriginSettler -->|"Route & Fulfill"| Vault
     Backend <-->|Co-sign state updates| Nitrolite
     Backend -->|Monitor events, checkpoints| Vault
     KMS -.->|Persistent Session Key| Nitrolite
@@ -99,7 +108,9 @@ sequenceDiagram
 sequenceDiagram
     participant U as User
     participant F as Frontend
-    participant LIFI as "LI.FI (ERC-7683)"
+    participant LR as "lif-rust"
+    participant LIFI as "LI.FI API"
+    participant OS as "UXOriginSettler"
     participant Chains as "Chains (e.g. Base, Ethereum)"
     participant V as "UXVault(s)"
     participant N as Nitrolite
@@ -107,20 +118,28 @@ sequenceDiagram
 
     U->>F: "Unify (e.g. dust from Base + Ethereum)"
     F->>F: "Build intent (sources, assets, amounts)"
-    F->>LIFI: Submit intent via SDK
-
-    LIFI->>Chains: Route & execute cross-chain
-    Chains->>V: Assets arrive at protocol vaults
+    F->>LR: "POST /lifi/quote (routing request)"
+    LR->>LIFI: "GET /quote"
+    LIFI-->>LR: "Route data"
+    LR-->>F: "Quote response"
+    
+    F->>LR: "POST /intent/calldata (order details)"
+    LR->>LR: "Encode ERC-7683 order + calldata"
+    LR-->>F: "{ to, data }"
+    
+    F->>OS: "Call open() with calldata"
+    OS->>Chains: "Route & execute cross-chain"
+    Chains->>V: "Assets arrive at protocol vaults"
 
     Note over V: Execution Guard: release only on atomic arrival / owner withdrawal
 
     V->>N: "State update (claims / liability)"
-    N->>N: Co-sign with user Session Key
-    N->>CN: Notify new state / balance
+    N->>N: "Co-sign with user Session Key"
+    N->>CN: "Notify new state / balance"
 
     CN->>F: "WebSocket (bu) — balance updated"
-    F->>F: Update Unified Balance UI
-    F->>U: Show success + updated balance
+    F->>F: "Update Unified Balance UI"
+    F->>U: "Show success + updated balance"
 ```
 
 ---
