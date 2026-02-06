@@ -12,13 +12,13 @@
 | **EIP712** | Domain separator and typed data hashing for delegation signatures. |
 | **Ownable / Ownable2Step** | Use Ownable2Step for safer ownership transfers. |
 
-## Custom Libraries for UXWallet
+## Custom Libraries for Flywheel
 
 | Library | Purpose |
 |---------|---------|
 | **SignatureVerification.sol** | EIP-712 signature verification for Persistent Session Keys and state updates. |
 | **StateVerification.sol** | Nitrolite (ERC-7824) state channel verification logic. |
-| **SafeTransfer.sol** | SafeERC20 wrapper with additional UXWallet-specific checks. |
+| **SafeTransfer.sol** | SafeERC20 wrapper with additional Flywheel-specific checks. |
 
 ## ERC Standards
 
@@ -32,7 +32,7 @@
 
 - **LI.FI SDK:** Use for creating and fulfilling ERC-7683 intents.
 - **Yellow SDK:** Use for Nitrolite state channel management and signature verification.
-- **Multi-chain RPC:** Abstract chain-specific differences (Yellow L3, Ethereum, Base) behind common interfaces.
+- **Multi-chain RPC:** Abstract chain-specific differences (Sepolia, Base Sepolia) behind common interfaces.
 
 ## Library Development Best Practices
 

@@ -1,6 +1,6 @@
 # Database Schema (On-Chain State)
 
-## UXVault Contract
+## Custody / Vault Contract
 
 | Mapping / State | Description |
 |-----------------|-------------|
@@ -20,8 +20,8 @@
 
 | Mapping / State | Description |
 |-----------------|-------------|
-| `mapping(address => uint256) public treasuryBalances` | Protocol treasury balances per token (for subsidizing Hybrid Exits). |
-| `uint256 public sponsoredExitCount` | Counter for sponsored exits (for analytics/monitoring). |
+| `mapping(address => uint256) public treasuryBalances` | Protocol treasury balances per token. |
+| `uint256 public sponsoredExitCount` | Counter for exit-related analytics (reserved for future use). |
 
 ## Adjudicator Contract (ERC-7824)
 

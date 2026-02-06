@@ -2,12 +2,14 @@
 
 | Attribute | Description |
 |-----------|-------------|
-| **Name** | UXWallet Solver & ClearNode Backend. |
-| **Purpose** | Acts as a **Just-In-Time (JIT) solver** in the LI.FI marketplace, using protocol vault liquidity to capture spread and distribute yield. Manages delegated Persistent Session Keys to co-sign Nitrolite state updates, enabling a "bear-yielding" non-custodial experience. |
-| **Target Users** | Web3 medium and advanced users. |
-| **MVP Chains** | Yellow L3 + Ethereum + Base. |
+| **Name** | Flywheel Solver & ClearNode Backend. |
+| **Purpose** | **ClearNode:** Nitrolite session and state-channel coordination; real-time WebSocket (e.g. `bu`) for the Flywheel Wallet. **Flywheel Solver:** Fulfills intents using the Aggregated Liquidity Pool (LP + Treasury). Registers credits and allocates rewards 50% to Users, 50% to Flywheel Treasury. |
+| **Target Users** | Web3 medium and advanced users (via Flywheel Wallet). |
+| **MVP** | Yellow on Sepolia + Base Sepolia; LiFi mocked. |
 
 ## Core Value Proposition
 
-- **For users**: One-time delegation, unified balance, automated "bear-yielding" experience, gasless Yellow L3 transactions, and one-step cross-chain actions.
-- **For the protocol**: Acts as a JIT solver in the LI.FI marketplace, capturing spread and distributing yield to users.
+- **For users:** One-time delegation (Session Key), unified balance, withdraw, 50% of intent-fulfillment rewards; user funds always protected.
+- **For the protocol:** Flywheel Solver uses pool (LP + Treasury) to fulfill intents; 50% rewards to Treasury (liquidity + owner withdrawal only).
+
+**Source of truth for flows:** `../../.context/sequence-diagrams.md`

@@ -7,10 +7,10 @@
 
 ## Error Naming Convention
 
-- Prefix with contract name for clarity: `UXVault__InsufficientBalance`, `SessionKeyRegistry__KeyExpired`.
+- Prefix with contract name for clarity: `Custody__InsufficientBalance`, `SessionKeyRegistry__KeyExpired`.
 - Use descriptive names that clearly indicate the failure reason.
 
-## Common Error Patterns for UXWallet
+## Common Error Patterns for Flywheel
 
 ```solidity
 // Session Key errors
@@ -20,11 +20,11 @@ error SessionKeyRegistry__InvalidSignature();
 error SessionKeyRegistry__UnauthorizedKey();
 
 // Vault errors
-error UXVault__InsufficientBalance();
-error UXVault__InsufficientLiquidity();
-error UXVault__InvalidAmount();
-error UXVault__TransferFailed();
-error UXVault__SolvencyInvariantViolated();
+error Custody__InsufficientBalance();
+error Custody__InsufficientLiquidity();
+error Custody__InvalidAmount();
+error Custody__TransferFailed();
+error Custody__SolvencyInvariantViolated();
 
 // Execution Guard errors
 error ExecutionGuard__IntentNotFulfilled();

@@ -2,15 +2,17 @@
 
 | Attribute | Description |
 |-----------|-------------|
-| **Name** | UXWallet Smart Contracts (Multi-Chain Vaults). |
-| **Purpose** | Secure custody and rule enforcement for a UX-focused, non-custodial, chain-agnostic wallet + aggregated liquidity protocol. Allows high-speed rebalancing via Nitrolite state updates while protecting the user's principal through an on-chain "Force Withdrawal" escape hatch. |
-| **Target Users** | Web3 medium and advanced users. |
-| **MVP Chains** | Yellow L3 + Ethereum + Base. |
+| **Name** | Flywheel Smart Contracts (Custody & Settlement). |
+| **Purpose** | Secure custody and rule enforcement for the aggregated liquidity protocol. Holds user and Treasury assets; integrates with **Yellow / Nitrolite (ERC-7824)** (Custody Contract, Adjudicator) for state-channel settlement. **User funds are always protected**; only **Flywheel Treasury** may be withdrawn by system owners. Supports Force Withdrawal escape hatch. |
+| **Target Users** | Web3 medium and advanced users (via Flywheel Wallet). |
+| **Chains** | Sepolia + Base Sepolia. |
 
 ## Core Value Proposition
 
-- **Secure custody:** Protocol-owned vaults hold user assets with trustless execution guarantees.
-- **Non-custodial:** Users retain ultimate control via Force Withdrawal escape hatch.
-- **Fast settlement:** Off-chain state updates via Nitrolite (ERC-7824) for real-time UX.
-- **Atomic guarantees:** Execution Guard ensures funds only move when counterpart is confirmed (intent fulfillment).
-- **Hybrid exits:** Treasury can sponsor withdrawals when local vault liquidity is insufficient.
+- **Secure custody:** Protocol-owned custody (Nitrolite Custody Contract) holds user and pool assets with trustless execution.
+- **Non-custodial:** Users retain ultimate control via Force Withdrawal (present last signed state to Adjudicator).
+- **Fast settlement:** Off-chain state via Nitrolite; on-chain payout via Adjudicator `conclude` / `transfer` (or `concludeAndTransferAllAssets`).
+- **Execution Guard:** Funds only released on atomic intent fulfillment or explicit user withdrawal.
+- **Treasury:** Flywheel Treasury is separate; owners may withdraw Treasury only—never user funds.
+
+**Source of truth for flows:** `../.context/sequence-diagrams.md` (project root).

@@ -2,20 +2,16 @@
 
 ## Contract-Specific User Stories
 
-- As a user, I want to deposit my assets into a secure UXVault so they can be used for yield-bearing solver activities while remaining non-custodial.
-- As a user, I want to withdraw my funds instantly (Direct Exit) if I provide a valid off-chain Nitrolite state proof and the local vault has sufficient liquidity.
-- As a protocol, I want to rebalance assets across chains using Nitrolite (ERC-7824) state channels for off-chain register of the new chain location of the users liquidity.
-- As a user, I want to revoke my Persistent Session Key instantly on-chain in case of a backend breach or security concern.
-- As a protocol, I want to use the Treasury to subsidize a withdrawal fee (Hybrid Exit / Sponsored Exit) if local liquidity is missing, guaranteeing a "Fast Exit" for users.
-- As a developer, I want to ensure the Execution Guard prevents assets from leaving the vault without an atomic counterpart (either confirmed arrival in another protocol vault OR explicit user signature).
-- As a user, I want a Force Withdrawal escape hatch that allows me to claim funds by presenting my last signed state update to the Adjudicator contract, bypassing the backend if it's unavailable.
-- As a protocol, I want to integrate with LI.FI (ERC-7683) intents for the Unification flow, ensuring atomic arrival of funds from multiple source chains.
+- As a user, I want to deposit assets into secure custody (Nitrolite Custody Contract) so they can be used in the Aggregated Liquidity Pool while remaining non-custodial.
+- As a user, I want to withdraw my funds (principal + my 50% reward share) when I request withdrawal, with payout via Adjudicator/Custody; user funds are never used for owner withdrawals.
+- As the protocol, I want to use Nitrolite (ERC-7824) state channels for off-chain state and Custody/Adjudicator for on-chain settlement (conclude / transfer).
+- As a user, I want to revoke my Session Key (Yellow) or stop delegating so the Solver can no longer act on my behalf.
+- As a developer, I want the Execution Guard to ensure funds are released only on atomic intent fulfillment or explicit user withdrawal.
+- As a user, I want a Force Withdrawal escape hatch: present my last signed state to the Adjudicator to claim funds if the backend is unavailable.
+- As the protocol, I want Custody and Adjudicator to integrate with Yellow/Nitrolite for channel lifecycle and on-chain payout.
 
-## Aligned with Frontend User Stories
+## Aligned with Flows (sequence-diagrams.md)
 
-- US-01: Support one-time delegation (EIP-712) via SessionKeyRegistry with scoped permissions and revocation capability.
-- US-02: Enforce invariants that enable "Unified Balance" (total vault assets ≥ total user claims).
-- US-03: Support Unification intents (ERC-7683) with Execution Guard ensuring atomic behavior.
-- US-04: Implement "Fast Exit Guarantee" logic (Direct Exit vs Sponsored Exit based on vault liquidity).
-- US-05: Enable gasless Yellow L3 P2P transfers via Nitrolite state channel updates (off-chain).
-- US-06: Support cross-chain transfers with Execution Guard validation.
+- Deposit: user locks funds in custody; channel setup; Session Key grant.
+- Fulfill: Solver uses pool; Adjudicator/Custody pay out to intent user.
+- Withdraw: user gets principal + 50% rewards; Treasury gets 50%; only Treasury may be withdrawn by owners.

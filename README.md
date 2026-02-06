@@ -1,194 +1,110 @@
-# UXWallet
+# Flywheel
 
-**A UX-focused, non-custodial, chain-agnostic wallet + aggregated liquidity protocol.**
+**A non-custodial wallet and aggregated liquidity protocol.** Users delegate assets to the Flywheel Wallet; the **Flywheel Solver** fulfills intents automatically using the **Aggregated Liquidity Pool** (user-delegated assets + Flywheel Treasury). Rewards from intent fulfillment are split **50% to Users** and **50% to the Flywheel Treasury**. User funds are always protected.
 
-UXWallet unifies fragmented cross-chain liquidity and generates yield automatically while keeping assets non-custodial. The product goal is a "one-step" user experience: hide bridging, gas, and chain switching behind a single delegation signature and clear progress UX.
+**Source of truth for flows:** [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md)
 
 ## Project Structure
 
 ```
-UXWallet/
-├── .context/              # Project-wide context and architecture documentation
-├── frontend/              # Next.js/React UI (TypeScript)
-├── backend/               # Node.js/TypeScript backend (ClearNode, Solver, KMS)
-├── contracts/             # Solidity smart contracts (Foundry)
-└── lif-rust/              # Rust microservice for LI.FI integration
+Flywheel/
+├── .context/              # Project-wide context; sequence-diagrams.md is canonical for flows
+├── frontend/              # Flywheel Wallet UI (Next.js/React, TypeScript)
+├── backend/               # ClearNode, Flywheel Solver, KMS (Node.js/TypeScript)
+├── contracts/             # Smart contracts (Foundry) — Custody, Adjudicator
+└── lif-rust/              # LiFi integration microservice (Rust, mocked in MVP)
 ```
 
 ## Architecture Overview
 
-UXWallet operates across **three distinct layers**:
+Flywheel aligns with **Yellow / Nitrolite (ERC-7824)** for state channels and custody. When the **liquidity layer can fulfill** (pool has funds on the target chain), transfers are settled from the pool. The MVP runs on **Sepolia** and **Base Sepolia** with **LiFi components mocked**.
 
-### Layer 1: Inbound Gateway (LI.FI / ERC-7683)
-- Users "Unify" fragmented assets from multiple chains into UXWallet Vaults via intent-based deposits
-- **lif-rust** microservice handles LI.FI API integration and ERC-7683 order encoding
-- **UXOriginSettler** contract validates and processes intents
-
-### Layer 2: Settlement Engine (Yellow / ERC-7824 via Nitrolite)
-- Asset movement is virtualized; claims are updated via Nitrolite State Channels
-- Off-chain liability exchange co-signed by user's Persistent Session Key
-- **Backend/ClearNode** provides real-time WebSocket updates (`bu` notifications)
-
-### Layer 3: Hybrid Exit Strategy ("Fast Exit Guarantee")
-- Protocol treasury sponsors LI.FI intent/bridge fees when local vault is insufficient
-- Guarantees fast withdrawals without extra user fees
+- **Flywheel Wallet (App):** User-facing app for delegate and withdraw. Users grant the Flywheel Solver permission via a **Session Key** (Yellow) so the Solver can fulfill intents without repeated signatures.
+- **ClearNode:** Yellow Nitrolite session and state-channel coordination; real-time updates.
+- **Flywheel Solver:** Fulfills intents using the Aggregated Liquidity Pool (LP + Treasury); registers credits; allocates rewards 50% Users / 50% Treasury.
+- **Aggregated Liquidity Pool:** User-delegated assets + Flywheel Treasury. Pool liquidity is used for payouts when available.
+- **Flywheel Treasury:** Receives 50% of intent-fulfillment rewards; part of available liquidity for the Solver; system owners may withdraw Treasury only—never user funds.
 
 ## Core Technologies
 
-- **LI.FI (ERC-7683)**: Intent-based cross-chain actions
-- **Yellow / Nitrolite (ERC-7824)**: State channels for off-chain-speed settlement
-- **EIP-712**: One-time delegation signature for session key authorization
+- **Yellow / Nitrolite (ERC-7824):** State channels, Custody Contract, Adjudicator (conclude / transfer).
+- **Session Key (Yellow):** One-time user grant (EIP-712) so the Solver can fulfill intents automatically (app-scoped, allowances, expiry).
 
-## MVP Chains
+## MVP Scope
 
-- Yellow L3
-- Ethereum
-- Base
+- **Yellow / Nitrolite** implemented on **Sepolia** and **Base Sepolia** (state channels, Custody, Adjudicator, ClearNode).
+- **LiFi system components mocked:** No real LiFi API or solver integration.
+- Goal: Validate delegation, deposit, pool fulfillment, reward split (50/50), and withdrawal.
 
 ## Sub-Projects
 
-### Frontend
-Next.js/React application providing the user interface.
+### Frontend (Flywheel Wallet)
 
-**Tech Stack**: TypeScript, React, Next.js, TailwindCSS
+Next.js/React UI for the Flywheel Wallet.
 
-**Key Features**:
-- One-time EIP-712 delegation flow
-- Unified balance view (aggregated across chains)
-- Real-time updates via WebSocket
-- Unify/Send/Withdraw flows with progress tracking
+**Tech Stack:** TypeScript, React, Next.js, TailwindCSS
 
-**Documentation**: See `frontend/.context/`
+**Key Features:** Delegate to pool (Session Key grant), unified balance, withdraw, real-time updates via ClearNode.
 
-**Getting Started**: See `frontend/README.md`
+**Docs:** `frontend/.context/`  
+**Run:** `frontend/README.md`
 
 ### Backend
-Node.js/TypeScript backend handling session keys, state channels, and JIT solver logic.
 
-**Tech Stack**: TypeScript, Node.js, PostgreSQL, Redis
+ClearNode, Flywheel Solver, and KMS.
 
-**Key Components**:
-- ClearNode (Nitrolite RPC + WebSocket)
-- JIT Solver Engine (LI.FI marketplace listener)
-- KMS (Key Management Service)
-- Inventory Manager
-- Rebalancer
+**Tech Stack:** TypeScript, Node.js, PostgreSQL, Redis
 
-**Documentation**: See `backend/.context/`
+**Key Components:** ClearNode (Nitrolite RPC/WebSocket), Flywheel Solver (intent fulfillment, pool), KMS (Session Keys), state persistence.
 
-**Getting Started**: See `backend/README.md`
+**Docs:** `backend/.context/`  
+**Run:** `backend/README.md`
 
 ### Contracts
-Solidity smart contracts deployed on Yellow L3, Ethereum, and Base.
 
-**Tech Stack**: Solidity, Foundry
+Custody and Adjudicator (Nitrolite/ERC-7824); user and Treasury asset security.
 
-**Key Contracts**:
-- `UXOriginSettler`: ERC-7683 intent handler
-- `UXVault`: Multi-chain custody vaults
-- `Adjudicator`: Nitrolite state verification (ERC-7824)
-- `SessionKeyRegistry`: Persistent session key management
-- `LifiAdapter`: LI.FI integration adapter
+**Tech Stack:** Solidity, Foundry
 
-**Documentation**: See `contracts/.context/`
+**Key Contracts:** Custody (Nitrolite), Adjudicator (Nitro), Force Withdrawal escape hatch.
 
-**Getting Started**:
-```bash
-cd contracts
-forge build
-forge test
-```
+**Docs:** `contracts/.context/`  
+**Run:** `cd contracts && forge build && forge test`
 
 ### lif-rust
-Rust microservice providing LI.FI API integration and ERC-7683 order encoding.
 
-**Tech Stack**: Rust, Axum, Alloy
+LiFi API integration and intent/order encoding; **mocked** for MVP.
 
-**Why Rust?**: Type-safe ABI encoding, performance, correctness guarantees. See `lif-rust/ARCHITECTURE.md` for detailed rationale.
+**Tech Stack:** Rust, Axum, Alloy
 
-**API Endpoints**:
-- `GET /health` - Health check
-- `POST /lifi/quote` - Fetch LI.FI routing quote
-- `POST /intent/build` - Build ERC-7683 order bytes
-- `POST /intent/calldata` - Generate UXOriginSettler.open() calldata
+**API:** `GET /health`, `POST /lifi/quote`, `POST /intent/build`, `POST /intent/calldata`
 
-**Documentation**: See `lif-rust/ARCHITECTURE.md`
-
-**Getting Started**:
-```bash
-cd lif-rust
-cargo run
-```
+**Docs:** `lif-rust/README.md`, `lif-rust/ARCHITECTURE.md`  
+**Run:** `cd lif-rust && cargo run`
 
 ## Communication Matrix
 
 | From | To | Method |
 |------|-----|--------|
-| **Frontend** | **Backend/ClearNode** | WebSocket (`bu`) + RPC |
-| **Frontend** | **lif-rust** | REST API |
-| **Frontend** | **Contracts** | JSON-RPC (ethers.js) |
-| **Backend** | **lif-rust** | REST API |
-| **Backend** | **Contracts** | JSON-RPC (ethers.js/viem) |
-| **lif-rust** | **LI.FI API** | HTTPS |
+| **Frontend** | **Backend/ClearNode** | WebSocket + RPC |
+| **Frontend** | **Contracts** | JSON-RPC (viem/ethers) |
+| **Backend** | **lif-rust** | REST (mocked) |
+| **Backend** | **Contracts** | JSON-RPC |
 
 ## Security Model
 
-- **Non-custodial**: Users retain ultimate control via Force Withdrawal
-- **Scoped delegation**: Persistent Session Keys can ONLY authorize state updates within vault network (not transfers to external addresses)
-- **Execution Guard**: Vault funds only released on atomic counterpart arrival or explicit user signature
-- **State verification**: Adjudicator validates all off-chain state updates
-
-## Development Workflow
-
-1. **Start local chain** (Anvil):
-   ```bash
-   cd contracts
-   anvil
-   ```
-
-2. **Deploy contracts**:
-   ```bash
-   cd contracts
-   forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
-   ```
-
-3. **Start lif-rust**:
-   ```bash
-   cd lif-rust
-   cargo run
-   ```
-
-4. **Start backend**:
-   ```bash
-   cd backend
-   npm install
-   npm run dev
-   ```
-
-5. **Start frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+- **Non-custodial:** Users retain control; Force Withdrawal via last signed state to Adjudicator.
+- **Session Key:** App-scoped, allowances, expiry; Solver can only fulfill intents per user grant.
+- **User funds protected:** Only Treasury may be withdrawn by system owners; user funds never used for owner withdrawals.
+- **Adjudicator:** Validates off-chain state and on-chain payouts (conclude / transfer).
 
 ## Documentation
 
-- **Project Context**: `.context/project-context.md`
-- **Architecture Diagrams**: `.context/diagrams.md`
-- **Frontend PRD**: `frontend/docs/uxwallet-frontend-prd.md`
-- **lif-rust Architecture**: `lif-rust/ARCHITECTURE.md`
+- **Flows (canonical):** [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md)
+- **Project context:** [`.context/project-context.md`](.context/project-context.md)
+- **Diagrams:** [`.context/diagrams.md`](.context/diagrams.md)
 
-Each sub-project has detailed `.context/` folders with:
-- Role definitions
-- System design
-- Tech stack documentation
-- Security guidelines
-- Testing strategies
-
-## Contributing
-
-See individual sub-project READMEs for contribution guidelines.
+Sub-projects have `.context/` folders with role definitions, system design, tech stack, security, and testing.
 
 ## License
 
