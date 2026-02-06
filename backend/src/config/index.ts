@@ -1,6 +1,22 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// Yellow ClearNode URLs
+const CLEARNODE_WSS_PRODUCTION = 'wss://clearnet.yellow.com/ws';
+const CLEARNODE_WSS_SANDBOX = 'wss://clearnet-sandbox.yellow.com/ws';
+
+/** Use Yellow sandbox for test env, production ClearNode otherwise. */
+const defaultClearNodeUrl =
+  process.env['NODE_ENV'] === 'test'
+    ? CLEARNODE_WSS_SANDBOX
+    : CLEARNODE_WSS_PRODUCTION;
+
+/** In test env, allow DATABASE_URL to be unset and use a placeholder so getConfig() works from .env only. */
+const defaultDatabaseUrl =
+  process.env['NODE_ENV'] === 'test'
+    ? 'postgresql://localhost:5432/flywheel_test?schema=public'
+    : undefined;
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
@@ -11,12 +27,15 @@ const envSchema = z.object({
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
     .default('info'),
 
-  DATABASE_URL: z.string().min(1),
+  DATABASE_URL:
+    defaultDatabaseUrl !== undefined
+      ? z.string().default(defaultDatabaseUrl)
+      : z.string().min(1),
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
   CLEARNODE_WSS_URL: z
     .string()
-    .default('wss://clearnet.yellow.com/ws'),
+    .default(defaultClearNodeUrl),
   CLEARNODE_APPLICATION: z.string().default('Flywheel'),
 
   RPC_URL_SEPOLIA: z.string().default('https://rpc.sepolia.org'),

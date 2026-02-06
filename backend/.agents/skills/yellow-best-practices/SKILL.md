@@ -10,7 +10,7 @@ Guidelines for building high-performance decentralized applications using Yellow
 ## Quick Start
 
 ```bash
-npm install @erc7824/nitrolite
+pnpm add @erc7824/nitrolite
 ```
 
 **ClearNode WebSocket URL**: `wss://clearnet.yellow.com/ws`
