@@ -1,0 +1,189 @@
+// ─────────────────────────────────────────────────────
+// UXWallet Backend — Prisma Schema
+// Aligned with backend/.context/02_architecture/database_schema.md
+// ─────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Session Keys (Persistent Session Key / EIP-712 delegations) ──
+model SessionKey {
+  id              String   @id @default(uuid())
+  userAddress     String   @map("user_address")
+  publicKey       String   @map("public_key")
+  signature       String   // EIP-712 delegation signature
+  permissionScope String   @map("permission_scope") // e.g. "nitrolite_state_update,lifi_intent_fulfillment"
+  expiresAt       DateTime @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userAddress])
+  @@index([userAddress, revokedAt])
+  @@map("session_keys")
+}
+
+// ── Sessions (Nitrolite / ERC-7824 state channel sessions) ──
+model Session {
+  id              String   @id @default(uuid())
+  channelId       String   @unique @map("channel_id")
+  participantA    String   @map("participant_a")  // user address
+  participantB    String   @map("participant_b")  // clearnode address
+  status          SessionStatus @default(OPEN)
+  sequenceNumber  Int      @default(0) @map("sequence_number") // replay protection
+  latestStateHash String?  @map("latest_state_hash")
+  latestStateSig  String?  @map("latest_state_sig")
+  latestStateData Json?    @map("latest_state_data") // full signed state (redundancy)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  transactions    Transaction[]
+
+  @@index([participantA])
+  @@index([participantB])
+  @@map("sessions")
+}
+
+enum SessionStatus {
+  OPEN
+  CLOSING
+  CLOSED
+  DISPUTED
+}
+
+// ── Transactions (off-chain state transitions) ──
+model Transaction {
+  id             String   @id @default(uuid())
+  sessionId      String   @map("session_id")
+  session        Session  @relation(fields: [sessionId], references: [id])
+  sequenceNumber Int      @map("sequence_number")
+  type           TransactionType
+  stateData      Json     @map("state_data")
+  signatureA     String?  @map("signature_a")
+  signatureB     String?  @map("signature_b")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([sessionId, sequenceNumber])
+  @@index([sessionId])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  STATE_UPDATE
+  BALANCE_UPDATE
+  INTENT_FULFILLMENT
+  WITHDRAWAL_INITIATION
+}
+
+// ── User Balances (Virtual Ledger) ──
+model UserBalance {
+  id          String   @id @default(uuid())
+  userAddress String   @map("user_address")
+  asset       String   // token symbol or address
+  balance     String   // stored as string for BigInt precision
+  chainId     Int?     @map("chain_id") // null = aggregated / unified
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userAddress, asset, chainId])
+  @@index([userAddress])
+  @@map("user_balances")
+}
+
+// ── Vault Inventory (real-time physical assets per chain) ──
+model VaultInventory {
+  id        String   @id @default(uuid())
+  chainId   Int      @map("chain_id")
+  asset     String
+  balance   String   // stored as string for BigInt precision
+  vaultAddress String @map("vault_address")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([chainId, asset, vaultAddress])
+  @@index([chainId])
+  @@map("vault_inventory")
+}
+
+// ── Intent Logs (LI.FI / ERC-7683 fulfillments) ──
+model IntentLog {
+  id               String   @id @default(uuid())
+  intentId         String   @map("intent_id")
+  sourceChainId    Int      @map("source_chain_id")
+  destinationChainId Int    @map("destination_chain_id")
+  asset            String
+  amount           String
+  spread           String   // captured spread (profit)
+  status           IntentStatus @default(PENDING)
+  fulfilledAt      DateTime? @map("fulfilled_at")
+  errorMessage     String?  @map("error_message")
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([intentId])
+  @@index([status])
+  @@map("intent_logs")
+}
+
+enum IntentStatus {
+  PENDING
+  EVALUATING
+  FULFILLING
+  FULFILLED
+  FAILED
+  SKIPPED
+}
+
+// ── Yield Logs (pro-rata profit distribution records) ──
+model YieldLog {
+  id          String   @id @default(uuid())
+  userAddress String   @map("user_address")
+  asset       String
+  amount      String
+  source      String   // e.g. "solver_spread", "rebalance_fee"
+  intentLogId String?  @map("intent_log_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userAddress])
+  @@index([createdAt])
+  @@map("yield_logs")
+}
+
+// ── Withdrawal Requests ──
+model WithdrawalRequest {
+  id                   String   @id @default(uuid())
+  userAddress          String   @map("user_address")
+  asset                String
+  amount               String
+  destinationChainId   Int      @map("destination_chain_id")
+  status               WithdrawalStatus @default(PENDING)
+  exitType             ExitType? @map("exit_type")
+  lifiIntentId         String?  @map("lifi_intent_id") // set if Sponsored Exit
+  txHash               String?  @map("tx_hash")
+  errorMessage         String?  @map("error_message")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@index([userAddress])
+  @@index([status])
+  @@map("withdrawal_requests")
+}
+
+enum WithdrawalStatus {
+  PENDING
+  EVALUATING
+  PROCESSING
+  BRIDGING       // Sponsored Exit in progress
+  COMPLETED
+  FAILED
+}
+
+enum ExitType {
+  DIRECT
+  SPONSORED
+}
