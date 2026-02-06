@@ -26,5 +26,5 @@
 
 ## Multi-chain Security
 
-- **Cross-chain Consistency:** Ensure contract behavior is consistent across Yellow L3, Ethereum, and Base; account for chain reorgs and finality differences.
+- **Cross-chain Consistency:** Ensure contract behavior is consistent across Phase 1 (Sepolia, Arbitrum Sepolia) and Phase 2 (Ethereum mainnet, Arbitrum mainnet); account for chain reorgs and finality differences.
 - **Bridge Security:** Validate bridge messages/proofs when coordinating Hybrid Exits across chains.

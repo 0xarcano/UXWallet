@@ -17,7 +17,7 @@ backend/
 │   ├── integrations/
 │   │   ├── lifi/             # LI.FI SDK wrapper (ERC-7683 intents)
 │   │   ├── yellow/           # Yellow SDK wrapper (ERC-7824 Nitrolite state channels)
-│   │   └── chains/           # Multi-chain RPC clients (Yellow L3, Ethereum, Base)
+│   │   └── chains/           # Multi-chain RPC clients (Phase 1: Sepolia, Arbitrum Sepolia; Phase 2: mainnet)
 │   └── utils/                # Signature verification, math, helpers
 ├── tests/
 │   ├── unit/

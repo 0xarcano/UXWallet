@@ -20,7 +20,7 @@
 - **Function Visibility:** Be explicit with visibility (public, external, internal, private); prefer `external` for functions called only externally (saves gas).
 - **Pure vs View:** Use `pure` for functions with no state access; `view` for read-only state access.
 
-## Safety Rules for UXWallet
+## Safety Rules for Flywheel
 
 - **No direct transfers:** All token transfers must use SafeERC20 wrappers.
 - **Session key scope enforcement:** Never allow session keys to authorize transfers to addresses outside the protocol vault network.

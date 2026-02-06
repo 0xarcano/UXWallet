@@ -2,7 +2,7 @@
 
 ## Unit Testing
 
-- **100% branch coverage** for all critical contracts: UXVault.sol, SessionKeyRegistry.sol, ExecutionGuard.sol, Adjudicator.sol.
+- **100% branch coverage** for all critical contracts: Custody (Nitrolite), SessionKeyRegistry.sol, ExecutionGuard.sol, Adjudicator.sol.
 - Test all state transitions and edge cases.
 - Test delegation lifecycle: creation (EIP-712), validation, expiration, revocation.
 - Test scoped permissions: ensure session keys cannot authorize transfers to external addresses.
@@ -27,7 +27,7 @@
 - **Unification Flow (ERC-7683):** Full flow: user signs intent → solver fulfills → funds arrive in vault → balance updated.
 - **Withdrawal Flow:** Test Direct Exit (sufficient liquidity) vs Sponsored Exit (insufficient liquidity, treasury sponsors).
 - **Force Withdrawal:** Test escape hatch: user presents last signed state → Adjudicator validates → funds released.
-- **Cross-chain Coordination:** Test vault interactions across Yellow L3, Ethereum, and Base (using Foundry multi-chain testing).
+- **Cross-chain Coordination:** Test custody/settlement across Phase 1 chains (Sepolia, Arbitrum Sepolia) and Phase 2 (Ethereum mainnet, Arbitrum mainnet) using Foundry multi-chain testing.
 
 ## Security Testing
 

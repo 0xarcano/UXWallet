@@ -8,7 +8,7 @@
 
 ## Integration Testing
 
-- **Solver Logic:** Test the JIT solver's decision-making (spread vs. inventory health) against mocked LI.FI marketplace data.
+- **Solver Logic:** Test the Flywheel Solver's decision-making (pool fulfill vs. LiFi fallback) and reward allocation (50% User, 50% Treasury) against mocked LiFi data in Phase 1.
 - **State Channels:** Test Nitrolite (ERC-7824) state update flows with mocked Yellow SDK.
 - **ClearNode:** Test WebSocket (`bu`) notifications and RPC endpoints for state queries.
 - **Hybrid Exit:** Test Direct Exit vs Sponsored Exit logic based on vault liquidity.

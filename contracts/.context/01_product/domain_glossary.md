@@ -2,16 +2,14 @@
 
 | Term | Definition |
 |------|------------|
-| **UXVault** | The on-chain vault contract holding user assets across multiple chains (Yellow L3, Ethereum, Base for MVP). |
-| **Persistent Session Key** | Session-scoped key created via one-time EIP-712 delegation; can only authorize state updates within the vault network as result of intent order fulfillment, NOT transfers to external addresses. |
-| **Checkpoint** | An on-chain proof of off-chain state (Nitrolite state channel state). |
-| **Force Withdrawal** | An escape hatch for users to claim funds without protocol permission by presenting their last signed state update to the Adjudicator contract. |
-| **SessionKeyRegistry** | On-chain mapping of Owner => Persistent Session Key with expiry timestamp and permission scopes. |
-| **Execution Guard** | Smart contract safety layer ensuring vault funds are only released when: (1) a corresponding asset is confirmed arriving on another protocol-owned vault (atomic intent behavior), OR (2) the owner explicitly signs an on-chain withdrawal. |
-| **Sponsorship Module / Treasury** | Contract logic for the protocol treasury to subsidize LI.FI bridge fees during "Hybrid Exits / Sponsored Exits" when local vault liquidity is insufficient. |
-| **Adjudicator** | The ERC-7824 contract verifying Nitrolite off-chain state updates and managing Force Withdrawal escape hatch. |
-| **Unified Balance** | A single aggregated per-asset balance (represented off-chain, enforced by on-chain vault invariants). |
-| **Hybrid Exit / Sponsored Exit** | Withdrawal mode where the protocol treasury sponsors LI.FI bridge fees when the local vault lacks sufficient liquidity. |
-| **Direct Exit** | Withdrawal mode where the local vault has sufficient liquidity; processed instantly via state channel close. |
-| **ERC-7683 Intent** | Standard for cross-chain intents used by LI.FI for the Unification flow. |
-| **ERC-7824 State Channel** | Standard for Nitrolite state channels used for off-chain-speed settlement. |
+| **Aggregated Liquidity Pool** | Pool of user-delegated assets plus Flywheel Treasury; used by the Flywheel Solver to fulfill intents (same-chain and cross-chain) when liquidity is available on the target chain. |
+| **Custody Contract (Nitrolite)** | ERC-7824 / Yellow contract that holds deposited funds, manages channel creation/resize/close, and releases funds on final settlement (with Adjudicator). |
+| **Adjudicator (Nitro)** | ERC-7824 contract that validates off-chain state and executes `conclude` / `transfer` (or `concludeAndTransferAllAssets`) to pay out allocations on-chain. |
+| **Session Key (Yellow)** | App-scoped key created via one-time EIP-712 delegation; allows the Flywheel Solver to fulfill intents without repeated user signatures (allowances, expires_at). |
+| **Force Withdrawal** | Escape hatch: user presents last signed state to the Adjudicator to claim funds without protocol cooperation. |
+| **Execution Guard** | Logic ensuring funds are released only when (1) corresponding asset is confirmed (intent fulfillment) or (2) owner explicitly signs on-chain withdrawal. |
+| **Flywheel Treasury** | Protocol treasury receiving 50% of intent-fulfillment rewards; part of pool liquidity; only Treasury may be withdrawn by system owners—never user funds. |
+| **Unified Balance** | Single aggregated per-asset balance (off-chain ledger, backed by on-chain custody). |
+| **ERC-7824** | State channel standard used by Nitrolite / Yellow. |
+
+**Source of truth for flows:** `../../.context/sequence-diagrams.md`

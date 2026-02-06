@@ -1,100 +1,110 @@
-# **UXWallet: General Project Context**
- 
-**A UX-focused, non-custodial, chain-agnostic wallet + aggregated liquidity protocol.**
- 
+# Flywheel: General Project Context
 
- 
-## **1. Vision & Product Perspective**
- 
-UXWallet is a UX-centric Web3 wallet that **unifies fragmented cross-chain liquidity** and **generates yield automatically**, while keeping assets **non-custodial**. The product goal is a “one-step” user experience: hide bridging, gas, and chain switching behind a single delegation signature and clear progress UX.
- 
-### **Target Users**
- 
-- **Web3 medium and advanced users**
- 
-### **MVP Chains (Frontend MVP scope)**
- 
-- **Yellow L3 + Ethereum + Base**
- 
-### **Value Proposition (PRD-consistent)**
- 
-- **For users**: one-time delegation, unified balance, automated “bear-yielding” experience, gasless Yellow L3 transactions, and one-step cross-chain actions.
-- **For the protocol**: acts as a **Just-In-Time (JIT) solver** in the LI.FI marketplace, using protocol vault liquidity to capture spread and distribute yield.
-- **Core innovation**: 
-- **Core technologies**: **LI.FI (ERC-7683)** intents + **Yellow / Nitrolite (ERC-7824)** state channels for off-chain-speed settlement and real-time UX.
- 
-## **2. What the Frontend Is Responsible For**
- 
-The frontend is a **Non-custodial Aggregated Liquidity Orchestrator UI**:
- 
-- Makes common actions feel atomic (unify, send, withdraw) with step-by-step progress and safe failure states.
-- Keeps the security boundary behind **one explicit EIP-712 delegation** and provides always-available **revocation** controls.
-- Presents a **Unified Balance** per asset (with optional per-chain breakdown).
-- Subscribes to **ClearNode WebSocket** updates (e.g., `bu`) to drive real-time balance/progress updates.
- 
-## **3. Technical Architecture Overview (3 layers)**
- 
-UXWallet operates across three distinct layers to provide an “Invisible Cross-Chain” experience.
- 
-### **Layer 1: Inbound Gateway (LI.FI / ERC-7683)**
- 
-- **Mechanism**: users **Unify** fragmented assets from multiple chains into UXWallet Vaults via intent-based deposits.
-- **Tech**: LI.FI SDK / Open Intent standard (ERC-7683) to bundle multi-chain deposits into a single logical step.
- 
-### **Layer 2: Settlement Engine (Yellow / ERC-7824 via Nitrolite)**
- 
-- **Mechanism**: once assets are in vaults, movement is virtualized; claims are updated via **Nitrolite State Channels**.
-- **Tech**: off-chain liability exchange co-signed by the user’s **Persistent Session Key**; UI reflects state-channel-driven states.
- 
-### **Layer 3: Hybrid Exit Strategy (“Fast Exit Guarantee”)**
- 
-- **Mechanism**: if a user withdraws on a chain where the local vault is insufficient, the protocol triggers a **Hybrid / Sponsored Exit**.
-- **Tech**: protocol treasury sponsors the LI.FI intent/bridge fee to pull liquidity from another chain, guaranteeing a fast exit without extra user fees.
- 
-## **4. Core Concepts & Security Model**
- 
-### **A. Delegation & Persistent Session Key (EIP-712)**
- 
-Users sign **one EIP-712 typed-data delegation** during onboarding. After delegation:
- 
-- Internal operations (rebalancing, solver fulfillment, state updates) must not require repeated wallet pop-ups.
-- The session key is **scoped**: it can authorize **state updates within the vault network** as result of an intent order fulfillment (checking that the funds are delivered in the another chain smart contract vault by the intents protocol that the solver is working with), and must **not** authorize transfers to external addresses that not are related to an intents order being fulfilled.
-- Delegation must be **auditable** in the UI (what was authorized, when) and **revocable** from Settings.
- 
-### **B. Execution Guard**
- 
-A smart contract safety layer ensuring vault funds are only released when:
- 
-1. A corresponding asset is confirmed arriving on another protocol-owned vault (atomic intent behavior), **or**
-2. The owner explicitly signs an on-chain withdrawal.
- 
-### **C. Safety Net: Force Withdrawal**
- 
-If the backend/ClearNode is unavailable, users can present their last signed state update to the on-chain **Adjudicator** contract to claim funds.
- 
-## **5. Sub-Project Integration Guidelines**
+**A non-custodial wallet and aggregated liquidity protocol.** Users delegate assets via the **Flywheel Wallet**; the **Flywheel Solver** fulfills intents using the **Aggregated Liquidity Pool** (user-delegated assets + Flywheel Treasury). Rewards from intent fulfillment are split **50% to Users** and **50% to the Flywheel Treasury**. User funds are always protected.
 
-### **Communication Matrix**
+**Canonical flows:** [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md)
+
+---
+
+## 1. Vision & Product Perspective
+
+Flywheel is a Web3 wallet that **unifies cross-chain liquidity** and **generates yield** from intent fulfillment while staying **non-custodial**. Users sign once (Session Key) to delegate; the Solver fulfills intents automatically. When the **pool has liquidity** on the target chain, the liquidity layer fulfills (best fee); when it does not, the system creates **intent orders in the LiFi marketplace** (funded from pool on source chains or Treasury-sponsored).
+
+### Target Users
+
+- Web3 medium and advanced users
+
+### Value Proposition
+
+- **For users:** One-time delegation, unified balance, send (same-chain / cross-chain), withdraw, 50% of intent-fulfillment rewards; user funds always protected.
+- **For the protocol:** Flywheel Solver uses the Aggregated Liquidity Pool (LP + Treasury) to fulfill intents; 50% of rewards go to the Flywheel Treasury (used as liquidity; owners may withdraw Treasury only).
+
+### Core Technologies
+
+- **Yellow / Nitrolite (ERC-7824):** State channels, Custody Contract, Adjudicator.
+- **Session Key (Yellow):** App-scoped delegation (EIP-712) so the Solver can fulfill intents without repeated wallet prompts.
+- **LiFi Marketplace:** Fallback when the liquidity layer cannot fulfill; intent orders funded from pool on source chains or Treasury-sponsored.
+
+---
+
+## 2. What the Frontend Is Responsible For
+
+The frontend is the **Flywheel Wallet** UI:
+
+- Delegate to pool and grant Solver permission (Session Key).
+- Unified balance (per asset, optional per-chain breakdown).
+- Send (same-chain / cross-chain) and Withdraw with clear progress and error states.
+- Subscribe to **ClearNode** (e.g. WebSocket) for real-time balance/updates.
+- Revocation of delegation in Settings.
+
+---
+
+## 3. Technical Architecture (aligned with sequence-diagrams.md)
+
+- **Layer 1 – Delegation & pool:** User delegates assets; App + ClearNode set up Nitrolite session/channel; funds locked in Custody (Yellow Smart Account / Nitrolite). User grants Session Key so Flywheel Solver can fulfill intents.
+- **Layer 2 – Settlement (Yellow/Nitrolite):** Off-chain state updates (Clearing Engine, state channel); on-chain payout via Adjudicator `conclude` / `transfer` (Custody). Rewards 50% User, 50% Treasury.
+- **Layer 3 – When pool cannot fulfill:** System creates intent orders in the **LiFi marketplace**. Funds to complete the order come from **pool on source chains** (release to LiFi solver) or **Flywheel Treasury** (sponsored same-chain). User balance debited; third party receives on target chain.
+
+---
+
+## 4. Core Concepts & Security
+
+### Delegation & Session Key (Yellow, EIP-712)
+
+- User signs **once** (EIP-712) to grant the Flywheel Solver permission (Session Key: application, allowances, expires_at).
+- Solver can then fulfill intents without repeated wallet pop-ups; scope and limits per Yellow Session Key docs.
+- Delegation auditable and revocable in the app.
+
+### Execution Guard
+
+Funds are released only when:
+
+1. Corresponding asset is confirmed (intent fulfillment / atomic behavior), or  
+2. Owner explicitly signs on-chain withdrawal.
+
+### Force Withdrawal
+
+If backend/ClearNode is unavailable, user can present last signed state to the on-chain **Adjudicator** to claim funds.
+
+### User Funds vs Treasury
+
+- **User funds:** Never used for owner withdrawals; always protected.
+- **Treasury:** Receives 50% of rewards; part of pool liquidity; **only** Treasury may be withdrawn by system owners.
+
+---
+
+## 5. Development Plan (2 Phases)
+
+### Phase 1: Protocol on Testnets, LiFi Mocked
+
+- **Yellow / Nitrolite** on **Sepolia** and **Arbitrum Sepolia** (state channels, Custody, Adjudicator, ClearNode).
+- **LiFi components mocked:** Flows that would use LiFi (when pool cannot fulfill) use mocks; no real LiFi API.
+- Focus: Delegation, deposit, pool fulfillment, 50/50 reward split, withdrawal; LiFi paths exercised with mocks.
+
+### Phase 2: Protocol on Mainnet, LiFi Integrated
+
+- **Yellow / Nitrolite** on **Ethereum mainnet** and **Arbitrum mainnet**.
+- **LiFi implemented:** Real LiFi marketplace; intent orders created and funded from pool on source chains or Treasury-sponsored.
+- Focus: Production behavior as in [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md).
+
+---
+
+## 6. Sub-Project Integration
+
+### Communication Matrix
 
 | From | To | Method |
-| :---- | :---- | :---- |
-| **Frontend** | **Backend / ClearNode** | WebSocket (e.g., `bu`) for real-time updates; RPC for state queries/handshake. |
-| **Frontend** | **lif-rust** | REST API for LI.FI quote fetching and ERC-7683 order encoding (used during Unify/Withdraw flows). |
-| **Backend** | **lif-rust** | REST API for LI.FI routing and intent order construction when JIT solver needs to fulfill marketplace orders. |
-| **Backend** | **Contracts** | Monitor events (deposits/withdrawals) & submit checkpoints/state where required. |
-| **Contracts** | **Frontend/Backend** | Shared ABIs and contract addresses (deployment artifacts). |
-| **lif-rust** | **LI.FI API** | External HTTP requests to LI.FI REST API for routing quotes and intent data. |
- 
-### **Integration Standards**
+|------|-----|--------|
+| **Frontend** | **Backend/ClearNode** | WebSocket (e.g. `bu`) + RPC |
+| **Frontend** | **lif-rust** | REST (LiFi quote/calldata; Phase 2 or mocked) |
+| **Backend** | **lif-rust** | REST (intent build for LiFi orders) |
+| **Backend** | **Contracts** | JSON-RPC (events, checkpoints, state) |
+| **Contracts** | **Frontend/Backend** | ABIs, deployment artifacts |
+| **lif-rust** | **LiFi API** | HTTPS (Phase 2) |
 
-1. **Shared environment**: maintain a root `.env.example` to synchronize chain IDs, RPC URLs, and API keys across folders (including lif-rust).
-2. **ABI synchronization**: after contract deployment, export ABIs to `frontend/src/abi`, `backend/src/abi`, and use in lif-rust for calldata encoding.
-3. **State persistence**: backend should persist the latest signed Nitrolite state (e.g., PostgreSQL) to reduce user friction and support safe recovery flows.
-4. **lif-rust service**: microservice for LI.FI API integration, providing REST endpoints for quote fetching and ERC-7683 order encoding; deployed independently, consumed by both frontend and backend.
- 
-## **6. MVP Phasing (PRD-aligned)**
- 
-- **Phase 0 (Foundation)**: connect + delegation (EIP-712), clear explanations, revoke in Settings, baseline error handling.
-- **Phase 1 (Core wallet)**: unified balance + yield display; real-time updates via ClearNode WebSocket `bu`.
-- **Phase 2 (Unification)**: “dust sweep” unify + add liquidity; intent progress tracking; safe, actionable failure states.
-- **Phase 3 (Send / Withdraw)**: gasless Yellow L3 P2P send; cross-chain send; withdraw with “Direct Exit” vs “Sponsored Exit (Hybrid)” behavior.
+### Integration Standards
+
+1. **Shared environment:** Root `.env.example` for chain IDs, RPC URLs, API keys (including lif-rust).
+2. **ABI sync:** After deployment, export ABIs to frontend/backend (and lif-rust where needed).
+3. **State persistence:** Backend persists latest signed Nitrolite state (e.g. PostgreSQL) for recovery.
+4. **lif-rust:** Stateless LiFi integration; in Phase 1 LiFi is mocked at callers.

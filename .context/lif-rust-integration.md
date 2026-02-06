@@ -1,118 +1,47 @@
-# lif-rust Integration Documentation
+# lif-rust Integration (Flywheel)
 
 ## Summary
 
-This document summarizes the integration of `lif-rust` as an official microservice in the UXWallet architecture, following the decision to adopt **Scenario B: Microservice Addition**.
+`lif-rust` is the microservice that integrates with the **LiFi API** for the Flywheel protocol. It is used when the **liquidity layer cannot fulfill** a transfer (e.g. pool has no funds on the destination chain, or on the requested chain for same-chain send). The system then **creates intent orders in the LiFi marketplace**; funds to complete those orders come from the **pool on source chains** (released to the LiFi solver) or from **Flywheel Treasury** (sponsored same-chain). See [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md) for flows.
 
-## What Changed
+## Role in Flywheel
 
-The lif-rust project has been formally integrated into the UXWallet architecture with full documentation updates across all sub-projects.
+- **When pool can fulfill:** Same-chain or cross-chain transfer is fulfilled from the Aggregated Liquidity Pool; no LiFi, no lif-rust.
+- **When pool cannot fulfill:** Flywheel Solver creates an intent order in the LiFi marketplace. lif-rust is used to:
+  - Fetch LiFi routing quotes
+  - Build/encode order data (e.g. ERC-7683) and calldata for the solver/contract side
 
-## Updated Documentation Files
+**Consumers:** Frontend (for user-initiated send when LiFi path is used), Backend Flywheel Solver (when creating LiFi intent orders).
 
-### Root Level
-- ✅ `.context/project-context.md` - Updated communication matrix and integration standards
-- ✅ `.context/diagrams.md` - Updated architecture diagrams to show lif-rust
-- ✅ `README.md` - Complete rewrite with project structure and lif-rust description
+## Development Phases
 
-### Backend Documentation
-- ✅ `backend/.context/01_product/domain_glossary.md` - Added lif-rust definition
-- ✅ `backend/.context/02_architecture/system_design.md` - Added to system components and communication matrix
-- ✅ `backend/.context/02_architecture/project_structure.md` - Updated Layer 1 integration notes
-- ✅ `backend/.context/04_tech_stack/library_patterns.md` - Added HTTP client for lif-rust communication
+- **Phase 1 (Testnets, LiFi mocked):** Yellow on Sepolia + Arbitrum Sepolia; **LiFi system components mocked**. lif-rust may be stubbed or called with mock responses so flows are testable without the real LiFi API.
+- **Phase 2 (Mainnet, LiFi integrated):** Yellow on Ethereum mainnet + Arbitrum mainnet; **LiFi implemented**. lif-rust talks to the real LiFi API; intent orders are created and funded from pool on source chains or Treasury-sponsored as in sequence-diagrams.md.
 
-### Frontend Documentation
-- ✅ `frontend/.context/02_architecture/system_design.md` - Added LI.FI integration via lif-rust
-- ✅ `frontend/.context/04_tech_stack/library_patterns.md` - Changed from @lifi/sdk to lif-rust REST API
-
-### lif-rust Documentation
-- ✅ `lif-rust/ARCHITECTURE.md` - New comprehensive architecture rationale document
-- ✅ `lif-rust/README.md` - Updated with architecture reference
-
-## Architecture Position
-
-lif-rust is now officially documented as part of **Layer 1: Inbound Gateway (LI.FI / ERC-7683)**.
-
-### Role
-A specialized Rust microservice that:
-1. Fetches LI.FI routing quotes
-2. Encodes ERC-7683 orders with type-safe ABI encoding
-3. Generates calldata for `UXOriginSettler.open()` transactions
-
-### Consumers
-- **Frontend**: User-initiated Unify/Withdraw flows
-- **Backend JIT Solver**: Marketplace order fulfillment
-
-### Dependencies
-- **LI.FI API**: External HTTPS calls for routing data
-- **UXOriginSettler contract**: Generates calldata for contract interactions
-
-## Communication Patterns
+## Communication
 
 ### Frontend → lif-rust
-```
-POST /lifi/quote       # Get routing quote
-POST /intent/calldata  # Get transaction calldata
-```
 
-### Backend → lif-rust
-```
-POST /lifi/quote     # Get routing quote
-POST /intent/build   # Build ERC-7683 order
-```
+- `POST /lifi/quote` — Get routing quote
+- `POST /intent/calldata` — Get transaction calldata (when LiFi path is used)
 
-### lif-rust → LI.FI API
-```
-GET /quote  # Fetch routing information
-```
+### Backend (Flywheel Solver) → lif-rust
 
-## Why Rust?
+- `POST /lifi/quote` — Get routing quote
+- `POST /intent/build` — Build order for LiFi marketplace
 
-Documented in `lif-rust/ARCHITECTURE.md`:
+### lif-rust → LiFi API
 
-1. **Type-safe ABI encoding** - Compile-time guarantees using `alloy-sol-types`
-2. **Performance** - 10-100x faster than JavaScript for complex struct encoding
-3. **Correctness** - Security-critical encoding with strong type safety
-4. **Resource efficiency** - Low memory footprint (~10-20MB)
+- HTTPS (Phase 2; mocked in Phase 1)
 
 ## Design Principles
 
-- **Stateless**: No session state, horizontally scalable
-- **Idempotent**: Same input → same output
-- **Fast**: Sub-10ms response time for encoding
-- **Separation of concerns**: Handles LI.FI integration only
+- **Stateless:** No session state; horizontally scalable
+- **Idempotent:** Same input → same output
+- **Separation of concerns:** LiFi integration only; custody and settlement remain Yellow/Nitrolite
 
-## Deployment
+## Documentation
 
-- Runs as independent service (Docker container or standalone binary)
-- Scales independently from backend/frontend
-- No secrets required (LI.FI API key optional, for rate limits only)
-
-## Integration Standards
-
-As documented in `.context/project-context.md`:
-
-1. **Shared environment**: lif-rust configuration in root `.env.example`
-2. **ABI synchronization**: Uses shared contract ABIs from `contracts/` deployment
-3. **REST API**: Standard HTTP/JSON for all communications
-4. **No state coupling**: Stateless design allows independent scaling
-
-## Future Considerations
-
-From `lif-rust/ARCHITECTURE.md`:
-
-1. **Caching**: Redis cache for quote results (5-min TTL)
-2. **Rate limiting**: Per-IP limits to prevent abuse
-3. **Metrics**: Prometheus observability
-4. **Status tracking**: Optional LI.FI order status polling
-
-## Key Takeaway
-
-lif-rust is **not** a prototype or experimental code. It is a production microservice that:
-
-- Provides critical LI.FI integration capabilities
-- Ensures type-safe ERC-7683 encoding
-- Maintains clean architectural separation
-- Serves both frontend and backend consumers
-
-All documentation has been updated to reflect this integration, ensuring consistency across the codebase.
+- **Canonical flows:** [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md)
+- **Project context:** [`.context/project-context.md`](.context/project-context.md)
+- **lif-rust details:** `lif-rust/README.md`, `lif-rust/ARCHITECTURE.md`

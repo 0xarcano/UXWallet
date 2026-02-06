@@ -10,8 +10,8 @@
 | **transactions** | History of off-chain state transitions for audit and recovery. |
 | **yield_logs** | Pro-rata profit distribution records (solver earnings distributed to users). |
 | **session_keys** | Store Persistent Session Keys (EIP-712 delegations) with user addresses, expiry, and permission scopes (KMS-backed). |
-| **vault_inventory** | Real-time tracking of physical assets across all supported chains (Yellow L3, Ethereum, Base for MVP). |
-| **intent_logs** | Records of LI.FI fulfillments (ERC-7683) and captured spreads from JIT solver activities. |
+| **vault_inventory** | Real-time tracking of physical assets across supported chains (Phase 1: Sepolia, Arbitrum Sepolia; Phase 2: Ethereum mainnet, Arbitrum mainnet). |
+| **intent_logs** | Records of intent fulfillments (pool or LiFi) and Flywheel Solver activity; reward allocation (50% User, 50% Treasury). |
 | **user_balances** | Virtual Ledger: aggregated unified balances per user per asset (off-chain). |
 | **withdrawal_requests** | Track pending withdrawals and whether they require Direct Exit or Sponsored Exit (Hybrid). |
 

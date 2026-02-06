@@ -1,6 +1,6 @@
 # Database Schema (On-Chain State)
 
-## UXVault Contract
+## Custody / Vault Contract
 
 | Mapping / State | Description |
 |-----------------|-------------|

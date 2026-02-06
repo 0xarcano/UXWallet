@@ -1,82 +1,46 @@
 # lif-rust
 
-Minimal Rust adapter that connects UXWallet on-chain intents to LI.FI routing.
+Rust microservice for **LiFi API** integration in the Flywheel protocol. Used when the **liquidity layer cannot fulfill** a transfer (pool has no funds on the target chain, or on the requested chain for same-chain send). The Flywheel Solver then creates **intent orders in the LiFi marketplace**; lif-rust fetches quotes and builds/encodes order data.
 
-## What this is
+**Canonical flows:** [`.context/sequence-diagrams.md`](../.context/sequence-diagrams.md)
 
-`lif-rust` is a tiny backend that does three things:
-1. Fetch a LI.FI quote.
-2. Build the ERC-7683 order bytes for `UXOriginSettler`.
-3. Return calldata so the wallet can send the tx.
+## Development phases
 
-## LI.FI API basics
+- **Phase 1 (Testnets, LiFi mocked):** Yellow on Sepolia + Arbitrum Sepolia. LiFi system components are **mocked**; callers may stub lif-rust or use mock responses.
+- **Phase 2 (Mainnet, LiFi integrated):** Yellow on Ethereum mainnet + Arbitrum mainnet. **LiFi implemented;** lif-rust talks to the real LiFi API.
 
-1. Base URL is `https://li.quest/v1`. citeturn0search1
-2. API keys are optional and only needed for higher rate limits. citeturn0search1
-3. If you use a key, send it in the `x-lifi-api-key` header and keep it server-side only. citeturn0search1
+## What this service does
 
-## Minimal workflow
+1. Fetch a LiFi quote.
+2. Build ERC-7683 order bytes for intent orders.
+3. Return calldata so the wallet or backend can send the transaction.
 
-1. `POST /lifi/quote` to get a route.
-2. `POST /intent/build` to build the ERC-7683 order bytes.
-3. `POST /intent/calldata` to get `{ to, data }` for `UXOriginSettler.open(...)`.
-4. Wallet signs + sends the transaction.
+## LiFi API basics
 
-## Service endpoints
+- Base URL: `https://li.quest/v1`
+- API keys optional (higher rate limits)
+- If using a key, send in `x-lifi-api-key` header; keep server-side only.
 
-1. `GET /health`
-1. `POST /lifi/quote`
-1. `POST /intent/build`
-1. `POST /intent/calldata`
+## Endpoints
+
+- `GET /health`
+- `POST /lifi/quote`
+- `POST /intent/build`
+- `POST /intent/calldata`
 
 ## Request examples
 
-`POST /lifi/quote` JSON body:
+`POST /lifi/quote` — see existing JSON body format in codebase (fromChain, toChain, fromToken, toToken, fromAmount, fromAddress, toAddress, slippage).
 
-```json
-{
-  "fromChain": 1,
-  "toChain": 8453,
-  "fromToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-  "toToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-  "fromAmount": "100000000000000000",
-  "fromAddress": "0x1111111111111111111111111111111111111111",
-  "toAddress": "0x2222222222222222222222222222222222222222",
-  "slippage": 0.03
-}
-```
-
-`POST /intent/build` JSON body:
-
-```json
-{
-  "fillDeadline": 1900000000,
-  "orderData": {
-    "user": "0x1111111111111111111111111111111111111111",
-    "inputToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-    "inputAmount": "100000000000000000",
-    "outputs": [
-      {
-        "token": "0x000000000000000000000000EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        "amount": "100000000000000000",
-        "recipient": "0x0000000000000000000000002222222222222222222222222222222222222222",
-        "chainId": 8453
-      }
-    ],
-    "destinationSettler": "0x0000000000000000000000003333333333333333333333333333333333333333",
-    "destinationCallData": ["0x"],
-    "nonce": 1,
-    "lifiCalldata": "0x"
-  }
-}
-```
+`POST /intent/build` — fillDeadline, orderData (user, inputToken, inputAmount, outputs, destinationSettler, etc.), nonce, lifiCalldata.
 
 ## Environment variables
 
-1. `LIFI_API_URL` defaults to `https://li.quest/v1`. citeturn0search1
-2. `LIFI_API_KEY` optional. Do not expose client-side. citeturn0search1
-3. `UX_ORIGIN_SETTLER` required for `/intent/calldata`.
-4. `PORT` defaults to `8080`.
+- `LIFI_API_URL` — defaults to `https://li.quest/v1`
+- `LIFI_API_KEY` — optional
+- `PORT` — defaults to `8080`
+
+(Phase 2 may add contract addresses for calldata generation where applicable.)
 
 ## Local dev
 
@@ -85,10 +49,8 @@ cd lif-rust
 cargo run
 ```
 
-## Files
+## Documentation
 
-1. `lif-rust/src/main.rs` axum server and routes.
-2. `lif-rust/src/types.rs` request/response types aligned to `UXOriginSettler` structs.
-3. `lif-rust/src/uxwallet_codec.rs` ABI encoding for `UXDepositOrder` and `OnchainCrossChainOrder`.
-4. `lif-rust/src/lifi_client.rs` LI.FI REST client.
-5. `lif-rust/src/error.rs` error mapping using `thiserror`.
+- **Flows:** [`.context/sequence-diagrams.md`](../.context/sequence-diagrams.md)
+- **Integration:** [`.context/lif-rust-integration.md`](../.context/lif-rust-integration.md)
+- **Architecture:** `lif-rust/ARCHITECTURE.md`
