@@ -8,10 +8,10 @@
 
 ## Integration Testing
 
-- **Solver Logic:** Test the Flywheel Solver's decision-making (pool fulfill vs. LiFi fallback) and reward allocation (50% User, 50% Treasury) against mocked LiFi data in Phase 1.
+- **Solver Logic:** Test the Flywheel Solver's pool fulfillment and reward allocation (50% User, 50% Treasury) with mocked LiFi.
 - **State Channels:** Test Nitrolite (ERC-7824) state update flows with mocked Yellow SDK.
 - **ClearNode:** Test WebSocket (`bu`) notifications and RPC endpoints for state queries.
-- **Hybrid Exit:** Test Direct Exit vs Sponsored Exit logic based on vault liquidity.
+- **Withdrawal:** Test withdrawal flow and liquidity checks.
 
 ## Load Testing
 
@@ -20,5 +20,5 @@
 
 ## End-to-End Testing
 
-- Full unification flow: user delegates → fragments detected → intent created → solver fulfills → balance updated → frontend receives `bu`.
-- Full withdrawal flow: request → check liquidity → Direct or Sponsored Exit → completion.
+- Full flow: user delegates → solver fulfills intents from pool → balance updated → frontend receives `bu`.
+- Full withdrawal flow: request → liquidity check → payout → completion.

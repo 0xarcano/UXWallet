@@ -12,7 +12,6 @@ contracts/
 │   │   ├── Adjudicator.sol           # ERC-7824 Nitrolite adjudicator (conclude / transfer)
 │   │   └── StateChannel.sol          # State channel logic and verification
 │   ├── intents/
-│   │   ├── LiFiIntentHandler.sol     # LiFi intent handling when pool cannot fulfill (Phase 2)
 │   │   └── IntentValidator.sol      # Validate intent fulfillment and atomic arrival
 │   ├── interfaces/
 │   │   ├── IUXVault.sol
@@ -39,7 +38,7 @@ contracts/
 │       ├── ExecutionGuardFuzz.t.sol
 │       └── InvariantTests.t.sol
 ├── script/
-│   ├── Deploy.s.sol                  # Phase 1: Sepolia, Arbitrum Sepolia; Phase 2: mainnet
+│   ├── Deploy.s.sol                  # Sepolia, Base Sepolia
 │   └── Config.s.sol
 └── .context/
 ```
@@ -50,4 +49,3 @@ contracts/
 - **Adjudicator:** Validates state; conclude / transfer for on-chain payout; Force Withdrawal.
 - **Treasury:** Flywheel Treasury; 50% of rewards; only Treasury withdrawable by owners; user funds protected.
 - **Execution Guard:** Release only on atomic intent fulfillment or explicit user withdrawal.
-- **LiFi (Phase 2):** When pool cannot fulfill; intent orders funded from pool on source chains or Treasury-sponsored.

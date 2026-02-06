@@ -2,37 +2,24 @@
 
 ## Summary
 
-`lif-rust` is the microservice that integrates with the **LiFi API** for the Flywheel protocol. It is used when the **liquidity layer cannot fulfill** a transfer (e.g. pool has no funds on the destination chain, or on the requested chain for same-chain send). The system then **creates intent orders in the LiFi marketplace**; funds to complete those orders come from the **pool on source chains** (released to the LiFi solver) or from **Flywheel Treasury** (sponsored same-chain). See [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md) for flows.
+`lif-rust` is the microservice that integrates with the **LiFi API** for the Flywheel protocol. For the MVP, **all LiFi system components are mocked**; callers use lif-rust with mock responses so flows are testable without the real LiFi API. See [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md) for flows.
 
 ## Role in Flywheel
 
-- **When pool can fulfill:** Same-chain or cross-chain transfer is fulfilled from the Aggregated Liquidity Pool; no LiFi, no lif-rust.
-- **When pool cannot fulfill:** Flywheel Solver creates an intent order in the LiFi marketplace. lif-rust is used to:
-  - Fetch LiFi routing quotes
-  - Build/encode order data (e.g. ERC-7683) and calldata for the solver/contract side
+- **MVP:** LiFi components are **mocked**. lif-rust may be stubbed or called with mock responses (Sepolia + Base Sepolia).
 
-**Consumers:** Frontend (for user-initiated send when LiFi path is used), Backend Flywheel Solver (when creating LiFi intent orders).
-
-## Development Phases
-
-- **Phase 1 (Testnets, LiFi mocked):** Yellow on Sepolia + Arbitrum Sepolia; **LiFi system components mocked**. lif-rust may be stubbed or called with mock responses so flows are testable without the real LiFi API.
-- **Phase 2 (Mainnet, LiFi integrated):** Yellow on Ethereum mainnet + Arbitrum mainnet; **LiFi implemented**. lif-rust talks to the real LiFi API; intent orders are created and funded from pool on source chains or Treasury-sponsored as in sequence-diagrams.md.
+**Consumers:** Backend Flywheel Solver (when creating LiFi intent orders; mocked at callers for MVP).
 
 ## Communication
 
-### Frontend → lif-rust
-
-- `POST /lifi/quote` — Get routing quote
-- `POST /intent/calldata` — Get transaction calldata (when LiFi path is used)
-
 ### Backend (Flywheel Solver) → lif-rust
 
-- `POST /lifi/quote` — Get routing quote
-- `POST /intent/build` — Build order for LiFi marketplace
+- `POST /lifi/quote` — Get routing quote (mocked)
+- `POST /intent/build` — Build order for LiFi marketplace (mocked)
 
 ### lif-rust → LiFi API
 
-- HTTPS (Phase 2; mocked in Phase 1)
+- Mocked in MVP.
 
 ## Design Principles
 

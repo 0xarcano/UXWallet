@@ -1,6 +1,6 @@
 # Flywheel — Architecture & Flow Diagrams
 
-This document contains high-level architecture diagrams. **All sequence flows (delegate, fulfill intents, send, withdraw, LiFi fallback) are defined in [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md), which is the source of truth.**
+This document contains high-level architecture diagrams. **All sequence flows (delegate, fulfill intents, withdraw) are defined in [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md), which is the source of truth.**
 
 ---
 
@@ -16,15 +16,11 @@ flowchart TB
         UI[Flywheel App]
         UI --> Delegation[Delegate & Session Key]
         UI --> Balance[Unified Balance]
-        UI --> Send[Send / Withdraw]
+        UI --> Withdraw[Withdraw]
     end
 
     subgraph Microservices["Microservices"]
-        LIFRUST[lif-rust\nLiFi REST API]
-    end
-
-    subgraph External["External"]
-        LIFIAPI[LiFi API\nPhase 2 or mocked]
+        LIFRUST[lif-rust\nLiFi REST API\nmocked]
     end
 
     subgraph Backend["Backend"]
@@ -45,9 +41,7 @@ flowchart TB
 
     Wallet <-->|Connect & EIP-712 Session Key| UI
     UI <-->|Real-time balance, progress| CN
-    UI -->|REST: quote, calldata| LIFRUST
-    Solver -->|REST: intent build| LIFRUST
-    LIFRUST -->|HTTPS| LIFIAPI
+    Solver -->|REST: intent build (mocked)| LIFRUST
     Backend <-->|State updates, co-sign| Custody
     Solver -->|Fulfill intents| PoolLP
     Solver -->|Use when needed| Treasury
@@ -60,9 +54,9 @@ flowchart TB
 
 *Detailed flow: see [sequence-diagrams.md — §1 User Delegates Assets](.context/sequence-diagrams.md).*
 
-- User connects wallet; App shows “Delegate to Pool” and “Allow Flywheel Solver to fulfill intents?” (Session Key).
+- User connects wallet; App shows "Delegate to Pool" and "Allow Flywheel Solver to fulfill intents?" (Session Key).
 - User signs once (EIP-712); Session Key registered with ClearNode (application, allowances, expires_at).
-- Solver can fulfill intents without further wallet prompts (app-scoped).
+- Solver can fulfill intents without further wallet pop-ups (app-scoped).
 
 ---
 
@@ -92,4 +86,4 @@ flowchart LR
 
 ---
 
-*For all transfer and fulfillment flows (pool fulfill, LiFi when pool cannot fulfill, Treasury-sponsored, rewards 50/50), see [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md).*
+*For delegate, fulfill, and withdraw flows (rewards 50/50), see [`.context/sequence-diagrams.md`](.context/sequence-diagrams.md).*

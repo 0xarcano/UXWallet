@@ -1,19 +1,14 @@
 # lif-rust
 
-Rust microservice for **LiFi API** integration in the Flywheel protocol. Used when the **liquidity layer cannot fulfill** a transfer (pool has no funds on the target chain, or on the requested chain for same-chain send). The Flywheel Solver then creates **intent orders in the LiFi marketplace**; lif-rust fetches quotes and builds/encodes order data.
+Rust microservice for **LiFi API** integration in the Flywheel protocol. For the MVP, LiFi system components are **mocked**; callers may stub lif-rust or use mock responses (Sepolia + Base Sepolia).
 
 **Canonical flows:** [`.context/sequence-diagrams.md`](../.context/sequence-diagrams.md)
 
-## Development phases
-
-- **Phase 1 (Testnets, LiFi mocked):** Yellow on Sepolia + Arbitrum Sepolia. LiFi system components are **mocked**; callers may stub lif-rust or use mock responses.
-- **Phase 2 (Mainnet, LiFi integrated):** Yellow on Ethereum mainnet + Arbitrum mainnet. **LiFi implemented;** lif-rust talks to the real LiFi API.
-
 ## What this service does
 
-1. Fetch a LiFi quote.
-2. Build ERC-7683 order bytes for intent orders.
-3. Return calldata so the wallet or backend can send the transaction.
+1. Fetch a LiFi quote (mocked in MVP).
+2. Build ERC-7683 order bytes for intent orders (mocked in MVP).
+3. Return calldata so the wallet or backend can send the transaction (mocked in MVP).
 
 ## LiFi API basics
 
@@ -39,8 +34,6 @@ Rust microservice for **LiFi API** integration in the Flywheel protocol. Used wh
 - `LIFI_API_URL` — defaults to `https://li.quest/v1`
 - `LIFI_API_KEY` — optional
 - `PORT` — defaults to `8080`
-
-(Phase 2 may add contract addresses for calldata generation where applicable.)
 
 ## Local dev
 

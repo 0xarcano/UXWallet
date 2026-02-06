@@ -2,7 +2,7 @@
 
 | Term | Definition |
 |------|------------|
-| **Aggregated Liquidity Pool** | Pool of user-delegated assets plus Flywheel Treasury; used by the Flywheel Solver to fulfill intents (same-chain and cross-chain) when liquidity is available on the target chain. |
+| **Aggregated Liquidity Pool** | Pool of user-delegated assets plus Flywheel Treasury; used by the Flywheel Solver to fulfill intents when liquidity is available. |
 | **Custody Contract (Nitrolite)** | ERC-7824 / Yellow contract that holds deposited funds, manages channel creation/resize/close, and releases funds on final settlement (with Adjudicator). |
 | **Adjudicator (Nitro)** | ERC-7824 contract that validates off-chain state and executes `conclude` / `transfer` (or `concludeAndTransferAllAssets`) to pay out allocations on-chain. |
 | **Session Key (Yellow)** | App-scoped key created via one-time EIP-712 delegation; allows the Flywheel Solver to fulfill intents without repeated user signatures (allowances, expires_at). |

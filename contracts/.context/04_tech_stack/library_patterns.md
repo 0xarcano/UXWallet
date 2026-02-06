@@ -32,7 +32,7 @@
 
 - **LI.FI SDK:** Use for creating and fulfilling ERC-7683 intents.
 - **Yellow SDK:** Use for Nitrolite state channel management and signature verification.
-- **Multi-chain RPC:** Abstract chain-specific differences (Phase 1: Sepolia, Arbitrum Sepolia; Phase 2: Ethereum mainnet, Arbitrum mainnet) behind common interfaces.
+- **Multi-chain RPC:** Abstract chain-specific differences (Sepolia, Base Sepolia) behind common interfaces.
 
 ## Library Development Best Practices
 

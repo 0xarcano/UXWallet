@@ -17,4 +17,4 @@
 - **Execution Guard**: Every function that releases vault funds must call `_executeWithGuard()` to ensure atomic behavior.
 - **Session Key Validation**: Every state update signed by a session key must validate: (1) key is not expired, (2) key is not revoked, (3) nonce is correct, (4) signature is valid.
 - **Invariant Checks**: After any state change affecting balances, assert `totalVaultLiquidity ≥ totalUserClaims`.
-- **Multi-chain Consistency**: Ensure contract logic works identically across Phase 1 (Sepolia, Arbitrum Sepolia) and Phase 2 (Ethereum mainnet, Arbitrum mainnet); account for chain-specific quirks like gas costs.
+- **Multi-chain Consistency**: Ensure contract logic works identically across MVP chains (Sepolia, Base Sepolia); account for chain-specific quirks like gas costs.

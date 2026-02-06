@@ -24,10 +24,10 @@
 
 ## Integration Testing
 
-- **Unification Flow (ERC-7683):** Full flow: user signs intent → solver fulfills → funds arrive in vault → balance updated.
-- **Withdrawal Flow:** Test Direct Exit (sufficient liquidity) vs Sponsored Exit (insufficient liquidity, treasury sponsors).
+- **Intent Fulfillment:** Solver fulfills from pool → funds arrive in vault → balance updated.
+- **Withdrawal Flow:** User requests withdrawal → Adjudicator/Custody payout → balance updated.
 - **Force Withdrawal:** Test escape hatch: user presents last signed state → Adjudicator validates → funds released.
-- **Cross-chain Coordination:** Test custody/settlement across Phase 1 chains (Sepolia, Arbitrum Sepolia) and Phase 2 (Ethereum mainnet, Arbitrum mainnet) using Foundry multi-chain testing.
+- **Cross-chain Coordination:** Test custody/settlement across MVP chains (Sepolia, Base Sepolia) using Foundry multi-chain testing.
 
 ## Security Testing
 

@@ -11,10 +11,9 @@ Flywheel contracts provide **custody and settlement** for the aggregated liquidi
 - **Custody Contract:** Holds deposited funds; channel creation, resize, close; final settlement releases funds per Adjudicator outcome.
 - **Adjudicator (Nitro):** Validates off-chain state; executes `conclude` and `transfer` (or `concludeAndTransferAllAssets`) to pay out allocations on-chain.
 
-### When Pool Fulfills vs LiFi
+### Pool Fulfillment
 
-- **Pool fulfills:** Payout from pool on the target chain via Custody/Adjudicator (same-chain or cross-chain when pool has liquidity).
-- **Pool cannot fulfill:** System creates intent orders in the LiFi marketplace; funds to complete orders come from pool on source chains or Treasury-sponsored. Contracts (Custody/Adjudicator) still release funds on the chains where pool liquidity is drawn.
+- **Pool fulfills:** Payout from pool via Custody/Adjudicator when pool has liquidity. LiFi components are mocked for MVP.
 
 ## Core Contract Components
 

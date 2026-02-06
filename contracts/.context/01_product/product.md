@@ -5,7 +5,7 @@
 | **Name** | Flywheel Smart Contracts (Custody & Settlement). |
 | **Purpose** | Secure custody and rule enforcement for the aggregated liquidity protocol. Holds user and Treasury assets; integrates with **Yellow / Nitrolite (ERC-7824)** (Custody Contract, Adjudicator) for state-channel settlement. **User funds are always protected**; only **Flywheel Treasury** may be withdrawn by system owners. Supports Force Withdrawal escape hatch. |
 | **Target Users** | Web3 medium and advanced users (via Flywheel Wallet). |
-| **Chains** | Phase 1: Sepolia + Arbitrum Sepolia. Phase 2: Ethereum mainnet + Arbitrum mainnet. |
+| **Chains** | Sepolia + Base Sepolia. |
 
 ## Core Value Proposition
 
