@@ -1,40 +1,52 @@
-/**
- * Express application factory.
- * Mounts middleware and all route modules.
- */
-import express, { type Express } from "express";
-import cors from "cors";
-import helmet from "helmet";
-import pinoHttp from "pino-http";
-import { logger } from "./lib/logger.js";
-import { errorHandler } from "./rpc/middleware/errorHandler.js";
-import { requestIdMiddleware } from "./rpc/middleware/requestId.js";
-import { standardRateLimiter, sensitiveRateLimiter } from "./rpc/middleware/rateLimiter.js";
-import { healthRouter } from "./rpc/routes/health.js";
-import { delegationRouter } from "./rpc/routes/delegation.js";
-import { balanceRouter } from "./rpc/routes/balance.js";
-import { withdrawalRouter } from "./rpc/routes/withdrawal.js";
-import { stateRouter } from "./rpc/routes/state.js";
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
+import websocket from '@fastify/websocket';
 
-export function createApp(): Express {
-  const app = express();
+import { getConfig } from './config/index.js';
+import { createLogger } from './lib/logger.js';
+import { getRedis } from './lib/redis.js';
 
-  // ── Global middleware ──
-  app.use(helmet());
-  app.use(cors());
-  app.use(express.json());
-  app.use(requestIdMiddleware);
-  app.use(pinoHttp({ logger }));
+import { registerRequestId } from './rpc/middleware/requestId.js';
+import { registerErrorHandler } from './rpc/middleware/errorHandler.js';
 
-  // ── Routes ──
-  app.use("/health", healthRouter);
-  app.use("/api/delegation", sensitiveRateLimiter, delegationRouter);
-  app.use("/api/balance", standardRateLimiter, balanceRouter);
-  app.use("/api/withdrawal", sensitiveRateLimiter, withdrawalRouter);
-  app.use("/api/state", standardRateLimiter, stateRouter);
+import { healthRoutes } from './rpc/routes/health.js';
+import { balanceRoutes } from './rpc/routes/balance.js';
+import { stateRoutes } from './rpc/routes/state.js';
+import { delegationRoutes } from './rpc/routes/delegation.js';
+import { withdrawalRoutes } from './rpc/routes/withdrawal.js';
+import { registerWebSocket } from './websocket/server.js';
 
-  // ── Error handler (must be last) ──
-  app.use(errorHandler);
+export async function buildApp() {
+  const config = getConfig();
+  const log = createLogger('server', config.LOG_LEVEL);
+
+  const app = Fastify({ logger: log });
+
+  // ── Plugins ─────────────────────────────────────────────────────────────
+  await app.register(cors, { origin: true });
+
+  await app.register(rateLimit, {
+    max: config.RATE_LIMIT_MAX,
+    timeWindow: config.RATE_LIMIT_WINDOW_MS,
+    redis: getRedis(),
+  });
+
+  await app.register(websocket);
+
+  // ── Middleware ───────────────────────────────────────────────────────────
+  registerRequestId(app);
+  registerErrorHandler(app);
+
+  // ── Routes ──────────────────────────────────────────────────────────────
+  await app.register(healthRoutes, { prefix: '/api' });
+  await app.register(balanceRoutes, { prefix: '/api' });
+  await app.register(stateRoutes, { prefix: '/api' });
+  await app.register(delegationRoutes, { prefix: '/api' });
+  await app.register(withdrawalRoutes, { prefix: '/api' });
+
+  // ── WebSocket ───────────────────────────────────────────────────────────
+  await app.register(registerWebSocket);
 
   return app;
 }

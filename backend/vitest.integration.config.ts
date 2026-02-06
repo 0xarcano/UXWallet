@@ -1,16 +1,11 @@
-import { defineConfig } from "vitest/config";
-import path from "node:path";
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    include: ['tests/integration/**/*.test.ts'],
     globals: true,
-    environment: "node",
-    include: ["tests/integration/**/*.test.ts"],
-    testTimeout: 30_000,
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
-    },
+    environment: 'node',
+    hookTimeout: 30_000,
+    testTimeout: 15_000,
   },
 });

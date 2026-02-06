@@ -1,56 +1,62 @@
 /**
- * k6 Load Test - WebSocket Concurrent Connections
- *
- * Targets: 1000+ simultaneous WebSocket connections receiving `bu` notifications.
+ * k6 load test for WebSocket balance-update (bu) notifications.
  *
  * Run: k6 run tests/load/k6-websocket.js
+ *
+ * Prerequisites:
+ *   - Backend running on http://localhost:3000 (ws://localhost:3000/ws)
  */
-import ws from "k6/ws";
-import { check, sleep } from "k6";
-import { Rate } from "k6/metrics";
 
-const errorRate = new Rate("ws_errors");
+import ws from 'k6/ws';
+import { check, sleep } from 'k6';
 
 export const options = {
   stages: [
-    { duration: "30s", target: 200 },
-    { duration: "1m", target: 500 },
-    { duration: "2m", target: 1000 },
-    { duration: "30s", target: 0 },
+    { duration: '30s', target: 100 },
+    { duration: '1m', target: 500 },
+    { duration: '1m', target: 1000 },
+    { duration: '30s', target: 0 },
   ],
   thresholds: {
-    ws_errors: ["rate<0.05"],  // <5% error rate
+    ws_connecting: ['p(95)<1000'],
   },
 };
 
-const WS_URL = __ENV.WS_URL || "ws://localhost:3001/ws";
+const WS_URL = __ENV.WS_URL || 'ws://localhost:3000/ws';
+const USER_ADDRESS = '0x' + 'a'.repeat(40);
 
 export default function () {
-  const address = `0x${Math.random().toString(16).slice(2, 42).padEnd(40, "0")}`;
-
-  const res = ws.connect(`${WS_URL}?address=${address}`, {}, function (socket) {
-    socket.on("open", () => {
-      // Connection established
+  const res = ws.connect(WS_URL, {}, function (socket) {
+    socket.on('open', function () {
+      // Subscribe to balance updates
+      socket.send(
+        JSON.stringify({
+          type: 'subscribe',
+          userAddress: USER_ADDRESS,
+        }),
+      );
     });
 
-    socket.on("message", (msg) => {
-      const data = JSON.parse(msg);
+    socket.on('message', function (message) {
+      const data = JSON.parse(message);
       check(data, {
-        "message has type": (d) => d.type !== undefined,
+        'received message': (d) => d.type !== undefined,
       });
     });
 
-    socket.on("error", (e) => {
-      errorRate.add(1);
-    });
+    // Keep connection alive for a bit
+    socket.setTimeout(function () {
+      socket.send(JSON.stringify({ type: 'ping' }));
+    }, 5000);
 
-    // Keep connection alive for test duration
-    sleep(10);
-
-    socket.close();
+    socket.setTimeout(function () {
+      socket.close();
+    }, 15000);
   });
 
   check(res, {
-    "ws status is 101": (r) => r && r.status === 101,
+    'ws status 101': (r) => r && r.status === 101,
   });
+
+  sleep(1);
 }

@@ -1,117 +1,87 @@
+import { logger as baseLogger } from '../../lib/logger.js';
+
+const logger = baseLogger.child({ module: 'lifi' });
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export interface LifiQuoteRequest {
+  fromChainId: number;
+  toChainId: number;
+  fromToken: string;
+  toToken: string;
+  fromAmount: string;
+  fromAddress: string;
+}
+
+export interface LifiQuote {
+  id: string;
+  estimatedAmount: string;
+  estimatedGas: string;
+  route: string;
+}
+
+export interface LifiIntentRequest {
+  quoteId: string;
+  fromAddress: string;
+  toAddress: string;
+}
+
+export interface LifiIntentResult {
+  intentId: string;
+  status: 'submitted' | 'fulfilled' | 'failed';
+  txHash?: string;
+}
+
+// ── Interface ───────────────────────────────────────────────────────────────
+
+export interface ILifiClient {
+  getQuote(req: LifiQuoteRequest): Promise<LifiQuote>;
+  submitIntent(req: LifiIntentRequest): Promise<LifiIntentResult>;
+}
+
+// ── Mock implementation (MVP) ───────────────────────────────────────────────
+
 /**
- * LI.FI Integration - HTTP client wrapper to lif-rust microservice.
+ * Mocked LiFi client for MVP.
  *
- * Endpoints (from project-context.md / system_design.md):
- * - POST /lifi/quote      - Get routing quote
- * - POST /intent/build    - Build ERC-7683 intent order
- * - POST /intent/calldata - Get calldata for UXOriginSettler
- *
- * All calls use exponential backoff retry (per error_handling.md).
+ * Returns deterministic fake data. When the real lif-rust microservice is
+ * available, swap this for a REST-based implementation of `ILifiClient`.
  */
-import { config } from "../../config/index.js";
-import { logger } from "../../lib/logger.js";
-import { withRetry } from "../../utils/retry.js";
-import { AppError } from "../../lib/errors.js";
+export class MockLifiClient implements ILifiClient {
+  async getQuote(req: LifiQuoteRequest): Promise<LifiQuote> {
+    logger.info({ req }, 'Mock LiFi: getQuote');
 
-export interface QuoteRequest {
-  readonly sourceChainId: number;
-  readonly destinationChainId: number;
-  readonly asset: string;
-  readonly amount: string;
-}
-
-export interface QuoteResponse {
-  readonly route: Record<string, unknown>;
-  readonly estimatedGasCost: string;
-  readonly bridgeFee: string;
-  readonly estimatedTime: number;
-}
-
-export interface IntentBuildRequest {
-  readonly intentId: string;
-  readonly sourceChainId: number;
-  readonly destinationChainId: number;
-  readonly asset: string;
-  readonly amount: string;
-}
-
-export interface IntentBuildResponse {
-  readonly orderData: Record<string, unknown>;
-  readonly encodedOrder: string;
-}
-
-export interface IntentCalldataRequest {
-  readonly orderData: Record<string, unknown>;
-  readonly userAddress: string;
-}
-
-export interface IntentCalldataResponse {
-  readonly to: string;
-  readonly data: string;
-  readonly value: string;
-}
-
-class LifiClient {
-  private readonly baseUrl: string;
-
-  constructor() {
-    this.baseUrl = config.lifRustBaseUrl;
+    return {
+      id: `mock-quote-${Date.now()}`,
+      estimatedAmount: req.fromAmount,
+      estimatedGas: '21000',
+      route: `${req.fromChainId}→${req.toChainId}`,
+    };
   }
 
-  /**
-   * Get a routing quote from lif-rust.
-   */
-  async getQuote(request: QuoteRequest): Promise<QuoteResponse> {
-    return this.post<QuoteResponse>("/lifi/quote", request, "getQuote");
-  }
+  async submitIntent(req: LifiIntentRequest): Promise<LifiIntentResult> {
+    logger.info({ req }, 'Mock LiFi: submitIntent');
 
-  /**
-   * Build an ERC-7683 intent order.
-   */
-  async buildIntentOrder(request: IntentBuildRequest): Promise<IntentBuildResponse> {
-    return this.post<IntentBuildResponse>("/intent/build", request, "buildIntentOrder");
-  }
-
-  /**
-   * Get calldata for the UXOriginSettler contract call.
-   */
-  async getIntentCalldata(request: IntentCalldataRequest): Promise<IntentCalldataResponse> {
-    return this.post<IntentCalldataResponse>("/intent/calldata", request, "getIntentCalldata");
-  }
-
-  /**
-   * POST with retry and structured error handling.
-   */
-  private async post<T>(
-    path: string,
-    body: unknown,
-    label: string,
-  ): Promise<T> {
-    return withRetry(
-      async () => {
-        const url = `${this.baseUrl}${path}`;
-        logger.debug({ url, label }, "lif-rust request");
-
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-
-        if (!response.ok) {
-          const errorBody = await response.text().catch(() => "");
-          throw new AppError(
-            `lif-rust ${label} failed: ${response.status} ${errorBody}`,
-            502,
-            "LIF_RUST_ERROR",
-          );
-        }
-
-        return (await response.json()) as T;
-      },
-      { maxRetries: 3, baseDelayMs: 500, maxDelayMs: 5000, label: `lifi:${label}` },
-    );
+    return {
+      intentId: `mock-intent-${Date.now()}`,
+      status: 'fulfilled',
+      txHash: '0x' + '0'.repeat(64),
+    };
   }
 }
 
-export const lifiClient = new LifiClient();
+// ── Singleton ───────────────────────────────────────────────────────────────
+
+let _client: ILifiClient | undefined;
+
+export function getLifiClient(): ILifiClient {
+  if (!_client) {
+    _client = new MockLifiClient();
+    logger.warn('Using MOCKED LiFi client — not suitable for production.');
+  }
+  return _client;
+}
+
+export function setLifiClient(client: ILifiClient): void {
+  _client = client;
+}

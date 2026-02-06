@@ -1,32 +1,50 @@
-/**
- * Centralized Express error handler.
- */
-import type { Request, Response, NextFunction } from "express";
-import { AppError } from "../../lib/errors.js";
-import { logger } from "../../lib/logger.js";
+import type { FastifyInstance, FastifyError } from 'fastify';
+import { isAppError } from '../../lib/errors.js';
 
-export function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
+/**
+ * Centralised Fastify error handler.
+ * Maps AppErrors to structured JSON; handles validation and rate-limit errors.
+ */
+export function registerErrorHandler(app: FastifyInstance): void {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    // ── Domain errors ─────────────────────────────────────────────────
+    if (isAppError(error as any)) {
+      const appErr = error as any;
+      request.log.warn({ err: appErr }, appErr.message);
+      return reply.status(appErr.statusCode).send(appErr.toJSON());
+    }
+
+    // ── Fastify schema-validation errors ──────────────────────────────
+    if (error.validation) {
+      request.log.warn({ err: error }, 'Validation error');
+      return reply.status(400).send({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message,
+        },
+      });
+    }
+
+    // ── Rate-limit errors ─────────────────────────────────────────────
+    if (error.statusCode === 429) {
+      return reply.status(429).send({
+        error: {
+          code: 'RATE_LIMITED',
+          message: 'Too many requests',
+        },
+      });
+    }
+
+    // ── Catch-all ─────────────────────────────────────────────────────
+    request.log.error({ err: error }, 'Unhandled error');
+    return reply.status(error.statusCode ?? 500).send({
       error: {
-        code: err.code,
-        message: err.message,
+        code: 'INTERNAL_ERROR',
+        message:
+          process.env['NODE_ENV'] === 'production'
+            ? 'Internal server error'
+            : error.message,
       },
     });
-    return;
-  }
-
-  // Unexpected errors
-  logger.error({ err }, "Unhandled error");
-  res.status(500).json({
-    error: {
-      code: "INTERNAL_ERROR",
-      message: "Internal server error",
-    },
   });
 }

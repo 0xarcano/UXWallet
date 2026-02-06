@@ -1,91 +1,96 @@
-/**
- * Unit tests for the Profitability Engine.
- *
- * Per stack_security.md: spread calculations must account for all fees
- * (gas, bridge, rebalancing) to prevent negative yields.
- */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { profitabilityEngine } from "../../../src/services/solver/profitability.js";
-import type { MarketplaceIntent } from "../../../src/services/solver/index.js";
+import { describe, it, expect } from 'vitest';
+import {
+  evaluateProfitability,
+  splitReward,
+} from '../../../src/services/solver/profitability.js';
 
-// Mock lifi client
-vi.mock("../../../src/integrations/lifi/client.js", () => ({
-  lifiClient: {
-    getQuote: vi.fn().mockResolvedValue({
-      route: {},
-      estimatedGasCost: "100",
-      bridgeFee: "50",
-      estimatedTime: 60,
-    }),
-  },
-}));
+describe('evaluateProfitability', () => {
+  it('returns profitable for a standard intent', () => {
+    const result = evaluateProfitability({
+      intentAmount: 1_000_000n,
+      estimatedGasCost: 100n,
+      bridgeFee: 0n,
+      minSpreadBps: 1,
+    });
 
-vi.mock("../../../src/lib/logger.js", () => ({
-  logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
-
-vi.mock("../../../src/config/index.js", () => ({
-  config: {
-    lifRustBaseUrl: "http://localhost:8080",
-    logLevel: "silent",
-    nodeEnv: "test",
-  },
-}));
-
-describe("ProfitabilityEngine", () => {
-  const makeIntent = (overrides: Partial<MarketplaceIntent> = {}): MarketplaceIntent => ({
-    intentId: "test-intent-1",
-    sourceChainId: 1,
-    destinationChainId: 8453,
-    asset: "USDC",
-    amount: "1000000", // 1 USDC (6 decimals)
-    minReceived: "998000", // 0.2% spread
-    ...overrides,
+    expect(result.isProfitable).toBe(true);
+    // 0.30 % of 1_000_000 = 3000
+    expect(result.grossReward).toBe(3000n);
+    expect(result.netReward).toBe(2900n); // 3000 − 100
+    expect(result.spreadBps).toBeGreaterThan(0);
   });
 
-  it("identifies a profitable intent (spread > costs)", async () => {
-    const result = await profitabilityEngine.evaluate(makeIntent());
-    expect(result.profitable).toBe(true);
-    expect(BigInt(result.spread)).toBe(2000n); // 1000000 - 998000
-    expect(BigInt(result.netProfit)).toBeGreaterThan(0n);
+  it('rejects when gas exceeds reward', () => {
+    const result = evaluateProfitability({
+      intentAmount: 1_000n,
+      estimatedGasCost: 10_000n,
+      bridgeFee: 0n,
+      minSpreadBps: 1,
+    });
+
+    expect(result.isProfitable).toBe(false);
+    expect(result.netReward).toBe(0n);
   });
 
-  it("rejects when spread is zero", async () => {
-    const result = await profitabilityEngine.evaluate(
-      makeIntent({ amount: "1000000", minReceived: "1000000" }),
-    );
-    expect(result.profitable).toBe(false);
-    expect(result.reason).toContain("Negative or zero spread");
+  it('accounts for bridge fees', () => {
+    const result = evaluateProfitability({
+      intentAmount: 1_000_000n,
+      estimatedGasCost: 0n,
+      bridgeFee: 500n,
+      minSpreadBps: 1,
+    });
+
+    // grossReward = 3000, net = 3000 − 500 = 2500
+    expect(result.netReward).toBe(2500n);
+    expect(result.isProfitable).toBe(true);
   });
 
-  it("rejects when spread is negative", async () => {
-    const result = await profitabilityEngine.evaluate(
-      makeIntent({ amount: "1000000", minReceived: "1000001" }),
-    );
-    expect(result.profitable).toBe(false);
-    expect(result.reason).toContain("Negative or zero spread");
+  it('rejects when spread below minSpreadBps', () => {
+    const result = evaluateProfitability({
+      intentAmount: 1_000_000n,
+      estimatedGasCost: 250n,
+      bridgeFee: 0n,
+      minSpreadBps: 100, // 1 % required
+    });
+
+    // net = 300 − 250 = 50 → 0.5 bps < 100
+    expect(result.isProfitable).toBe(false);
   });
 
-  it("rejects when spread is below minimum threshold", async () => {
-    // 0.05% spread = 5bps, below the 10bps minimum
-    const result = await profitabilityEngine.evaluate(
-      makeIntent({ amount: "1000000", minReceived: "999500" }),
-    );
-    expect(result.profitable).toBe(false);
-    expect(result.reason).toContain("below minimum");
+  it('throws on non-positive intentAmount', () => {
+    expect(() =>
+      evaluateProfitability({
+        intentAmount: 0n,
+        estimatedGasCost: 0n,
+        bridgeFee: 0n,
+        minSpreadBps: 0,
+      }),
+    ).toThrow();
+  });
+});
+
+describe('splitReward', () => {
+  it('splits evenly when even', () => {
+    const { userReward, treasuryReward } = splitReward(100n);
+    expect(userReward).toBe(50n);
+    expect(treasuryReward).toBe(50n);
   });
 
-  it("rejects when costs exceed spread", async () => {
-    // Tiny amount where costs dominate
-    const result = await profitabilityEngine.evaluate(
-      makeIntent({ amount: "300", minReceived: "296" }), // 4 spread but >150 cost
-    );
-    // spread is ~133bps, costs estimated at 150
-    expect(result.profitable).toBe(false);
+  it('gives rounding dust to treasury', () => {
+    const { userReward, treasuryReward } = splitReward(101n);
+    expect(userReward).toBe(50n);
+    expect(treasuryReward).toBe(51n);
+  });
+
+  it('handles zero', () => {
+    const { userReward, treasuryReward } = splitReward(0n);
+    expect(userReward).toBe(0n);
+    expect(treasuryReward).toBe(0n);
+  });
+
+  it('handles 1 (indivisible)', () => {
+    const { userReward, treasuryReward } = splitReward(1n);
+    expect(userReward).toBe(0n);
+    expect(treasuryReward).toBe(1n);
   });
 });

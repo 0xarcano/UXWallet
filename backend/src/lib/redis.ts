@@ -1,26 +1,31 @@
-/**
- * Redis client singleton (ioredis).
- */
-import Redis from "ioredis";
-import { config } from "../config/index.js";
-import { logger } from "./logger.js";
+import { Redis } from 'ioredis';
+import { logger } from './logger.js';
 
-export const redis = new Redis(config.redisUrl, {
-  maxRetriesPerRequest: 3,
-  retryStrategy(times) {
-    const delay = Math.min(times * 200, 5000);
-    return delay;
-  },
-  lazyConnect: true,
-});
+let redis: Redis | undefined;
 
-redis.on("connect", () => logger.info("Redis connected"));
-redis.on("error", (err) => logger.error({ err }, "Redis error"));
+export function getRedis(): Redis {
+  if (!redis) {
+    const url = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+    redis = new Redis(url, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times: number) {
+        const delay = Math.min(times * 200, 3000);
+        return delay;
+      },
+      lazyConnect: true,
+    });
 
-export async function connectRedis(): Promise<void> {
-  await redis.connect();
+    redis.on('connect', () => logger.info('Redis connected'));
+    redis.on('error', (err: Error) => logger.error({ err }, 'Redis error'));
+  }
+  return redis;
 }
 
 export async function disconnectRedis(): Promise<void> {
-  await redis.quit();
+  if (redis) {
+    await redis.quit();
+    redis = undefined;
+  }
 }
+
+export type { Redis };

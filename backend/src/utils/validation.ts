@@ -1,38 +1,55 @@
-/**
- * Common validation helpers.
- */
-import { isAddress } from "viem";
-import { ValidationError } from "../lib/errors.js";
+import { z } from 'zod';
 
-export function validateAddress(address: string, field = "address"): `0x${string}` {
-  if (!isAddress(address)) {
-    throw new ValidationError(`Invalid Ethereum address for field '${field}': ${address}`);
-  }
-  return address as `0x${string}`;
-}
+// ── Reusable Zod primitives ─────────────────────────────────────────────────
 
-export function validateChainId(chainId: number, field = "chainId"): number {
-  if (!Number.isInteger(chainId) || chainId <= 0) {
-    throw new ValidationError(`Invalid chain ID for field '${field}': ${chainId}`);
-  }
-  return chainId;
-}
+/** 0x-prefixed, 40-hex-char Ethereum address. */
+export const ethereumAddress = z
+  .string()
+  .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address');
 
-export function validatePositiveAmount(amount: string, field = "amount"): bigint {
-  try {
-    const value = BigInt(amount);
-    if (value <= 0n) {
-      throw new Error("non-positive");
-    }
-    return value;
-  } catch {
-    throw new ValidationError(`Invalid positive amount for field '${field}': ${amount}`);
-  }
-}
+/** Non-negative integer represented as a string (for BigInt values). */
+export const uint256String = z
+  .string()
+  .regex(/^\d+$/, 'Must be a non-negative integer string');
 
-export function validateHexString(hex: string, field = "hex"): `0x${string}` {
-  if (!/^0x[0-9a-fA-F]+$/.test(hex)) {
-    throw new ValidationError(`Invalid hex string for field '${field}': ${hex}`);
-  }
-  return hex as `0x${string}`;
-}
+/** Positive chain ID. */
+export const chainId = z.number().int().positive();
+
+/** Hex-encoded byte string (0x…). */
+export const hexString = z
+  .string()
+  .regex(/^0x[a-fA-F0-9]*$/, 'Invalid hex string');
+
+// ── Composite schemas ───────────────────────────────────────────────────────
+
+export const allowanceSchema = z.object({
+  asset: z.string().min(1),
+  amount: uint256String,
+});
+
+export const delegationRequestSchema = z.object({
+  userAddress: ethereumAddress,
+  sessionKeyAddress: ethereumAddress,
+  application: z.string().min(1),
+  scope: z.string().min(1),
+  allowances: z.array(allowanceSchema),
+  expiresAt: z.number().int().positive(),
+  signature: hexString,
+});
+
+export const withdrawalRequestSchema = z.object({
+  userAddress: ethereumAddress,
+  asset: z.string().min(1),
+  amount: uint256String,
+  chainId,
+});
+
+export const balanceQuerySchema = z.object({
+  userAddress: ethereumAddress,
+  asset: z.string().min(1).optional(),
+});
+
+export const stateQuerySchema = z.object({
+  channelId: hexString.optional(),
+  userAddress: ethereumAddress.optional(),
+});

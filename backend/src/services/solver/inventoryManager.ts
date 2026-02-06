@@ -1,154 +1,158 @@
-/**
- * Inventory Manager — tracks vault liquidity across chains and enforces "Fast Exit Guarantee".
- *
- * Never fulfill an intent if it would break withdrawal guarantees.
- */
-import { prisma } from "../../lib/prisma.js";
-import { logger } from "../../lib/logger.js";
+import { getPrisma, type PrismaClient } from '../../lib/prisma.js';
+import { logger as baseLogger } from '../../lib/logger.js';
+import { AppError, ErrorCode } from '../../lib/errors.js';
 
-export interface HealthCheckResult {
-  readonly safe: boolean;
-  readonly reason: string;
-  readonly availableBalance: string;
-  readonly requiredReserve: string;
-}
+const logger = baseLogger.child({ module: 'solver:inventory' });
 
-class InventoryManager {
-  /**
-   * Minimum reserve ratio — vault must retain at least this fraction of total user claims.
-   * E.g., 0.2 = always keep 20% reserve for withdrawal guarantees.
-   */
-  private readonly minReserveRatio = 0.2;
+// ── Service ─────────────────────────────────────────────────────────────────
+
+export class InventoryManager {
+  constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Check if fulfilling an intent is safe w.r.t. inventory health.
-   * Returns { safe: true } if fulfillment won't break Fast Exit Guarantee.
+   * Get the current inventory for a given chain + asset.
    */
-  async checkHealth(
+  async getInventory(
     chainId: number,
     asset: string,
-    fulfillmentAmount: string,
-  ): Promise<HealthCheckResult> {
-    // 1. Get current vault balance on the destination chain
-    const inventory = await prisma.vaultInventory.findFirst({
-      where: { chainId, asset },
+  ): Promise<{ amount: bigint }> {
+    const record = await this.prisma.vaultInventory.findUnique({
+      where: { chainId_asset: { chainId, asset: asset.toLowerCase() } },
     });
 
-    const currentBalance = BigInt(inventory?.balance ?? "0");
-    const amount = BigInt(fulfillmentAmount);
-
-    // 2. Get total user claims for this asset on this chain
-    const userClaims = await this.getTotalUserClaims(chainId, asset);
-
-    // 3. Calculate required reserve
-    const requiredReserve = (userClaims * BigInt(Math.floor(this.minReserveRatio * 1000))) / 1000n;
-
-    // 4. Check if post-fulfillment balance exceeds reserve
-    const postFulfillmentBalance = currentBalance - amount;
-
-    if (postFulfillmentBalance < 0n) {
-      return {
-        safe: false,
-        reason: `Insufficient vault balance: have ${currentBalance}, need ${amount}`,
-        availableBalance: currentBalance.toString(),
-        requiredReserve: requiredReserve.toString(),
-      };
-    }
-
-    if (postFulfillmentBalance < requiredReserve) {
-      return {
-        safe: false,
-        reason: `Would break Fast Exit Guarantee: post-balance ${postFulfillmentBalance} < reserve ${requiredReserve}`,
-        availableBalance: currentBalance.toString(),
-        requiredReserve: requiredReserve.toString(),
-      };
-    }
-
-    return {
-      safe: true,
-      reason: "OK",
-      availableBalance: currentBalance.toString(),
-      requiredReserve: requiredReserve.toString(),
-    };
+    return { amount: record ? BigInt(record.amount) : 0n };
   }
 
   /**
-   * Record an intent fulfillment by deducting from vault inventory.
+   * Check if there is sufficient liquidity to fulfill an intent.
+   * Never fulfills if it would break the "Fast Exit Guarantee"
+   * (i.e. reserved withdrawal amounts must remain).
    */
-  async recordFulfillment(
+  async hasLiquidity(
     chainId: number,
     asset: string,
-    amount: string,
-  ): Promise<void> {
-    const inventory = await prisma.vaultInventory.findFirst({
-      where: { chainId, asset },
+    requiredAmount: bigint,
+  ): Promise<boolean> {
+    const { amount: available } = await this.getInventory(chainId, asset);
+
+    // Reserve: sum of pending withdrawals on this chain + asset
+    const pendingWithdrawals = await this.prisma.withdrawalRequest.findMany({
+      where: {
+        chainId,
+        asset: asset.toLowerCase(),
+        status: { in: ['PENDING', 'PROCESSING'] },
+      },
+      select: { amount: true },
     });
 
-    if (!inventory) {
-      logger.warn({ chainId, asset }, "No vault inventory record found for fulfillment");
-      return;
-    }
+    const reserved = pendingWithdrawals.reduce(
+      (acc, w) => acc + BigInt(w.amount),
+      0n,
+    );
+    const usable = available > reserved ? available - reserved : 0n;
 
-    const newBalance = BigInt(inventory.balance) - BigInt(amount);
+    const sufficient = usable >= requiredAmount;
 
-    await prisma.vaultInventory.update({
-      where: { id: inventory.id },
-      data: { balance: newBalance.toString() },
+    logger.debug(
+      {
+        chainId,
+        asset,
+        available: available.toString(),
+        reserved: reserved.toString(),
+        usable: usable.toString(),
+        required: requiredAmount.toString(),
+        sufficient,
+      },
+      'Liquidity check',
+    );
+
+    return sufficient;
+  }
+
+  /**
+   * Atomically debit inventory after fulfillment.
+   */
+  async debit(
+    chainId: number,
+    asset: string,
+    amount: bigint,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const record = await tx.vaultInventory.findUnique({
+        where: { chainId_asset: { chainId, asset: asset.toLowerCase() } },
+      });
+
+      const current = record ? BigInt(record.amount) : 0n;
+      if (current < amount) {
+        throw new AppError(
+          ErrorCode.INSUFFICIENT_LIQUIDITY,
+          `Insufficient inventory: have ${current}, need ${amount}`,
+        );
+      }
+
+      await tx.vaultInventory.upsert({
+        where: { chainId_asset: { chainId, asset: asset.toLowerCase() } },
+        update: { amount: (current - amount).toString() },
+        create: {
+          chainId,
+          asset: asset.toLowerCase(),
+          amount: '0',
+        },
+      });
     });
 
     logger.info(
-      { chainId, asset, oldBalance: inventory.balance, newBalance: newBalance.toString() },
-      "Vault inventory updated after fulfillment",
+      { chainId, asset, amount: amount.toString() },
+      'Inventory debited',
     );
   }
 
   /**
-   * Record an incoming deposit (increases vault inventory).
+   * Credit inventory (e.g. after deposit or solver settlement).
+   * Uses a transaction to read-then-write atomically.
    */
-  async recordDeposit(
+  async credit(
     chainId: number,
     asset: string,
-    vaultAddress: string,
-    amount: string,
+    amount: bigint,
   ): Promise<void> {
-    await prisma.vaultInventory.upsert({
-      where: {
-        chainId_asset_vaultAddress: { chainId, asset, vaultAddress },
-      },
-      update: {
-        balance: (
-          BigInt(
-            (await prisma.vaultInventory.findFirst({ where: { chainId, asset, vaultAddress } }))
-              ?.balance ?? "0",
-          ) + BigInt(amount)
-        ).toString(),
-      },
-      create: {
-        chainId,
-        asset,
-        vaultAddress,
-        balance: amount,
-      },
-    });
-  }
+    await this.prisma.$transaction(async (tx) => {
+      const record = await tx.vaultInventory.findUnique({
+        where: { chainId_asset: { chainId, asset: asset.toLowerCase() } },
+      });
 
-  /**
-   * Get total user claims for an asset on a specific chain.
-   */
-  private async getTotalUserClaims(
-    chainId: number,
-    asset: string,
-  ): Promise<bigint> {
-    const balances = await prisma.userBalance.findMany({
-      where: { asset, chainId },
+      const current = record ? BigInt(record.amount) : 0n;
+      const newAmount = (current + amount).toString();
+
+      await tx.vaultInventory.upsert({
+        where: { chainId_asset: { chainId, asset: asset.toLowerCase() } },
+        update: { amount: newAmount },
+        create: {
+          chainId,
+          asset: asset.toLowerCase(),
+          amount: newAmount,
+        },
+      });
     });
 
-    let total = 0n;
-    for (const b of balances) {
-      total += BigInt(b.balance);
-    }
-    return total;
+    logger.info(
+      { chainId, asset, amount: amount.toString() },
+      'Inventory credited',
+    );
   }
 }
 
-export const inventoryManager = new InventoryManager();
+// ── Singleton ───────────────────────────────────────────────────────────────
+
+let _manager: InventoryManager | undefined;
+
+export function getInventoryManager(): InventoryManager {
+  if (!_manager) {
+    _manager = new InventoryManager(getPrisma());
+  }
+  return _manager;
+}
+
+export function resetInventoryManager(): void {
+  _manager = undefined;
+}

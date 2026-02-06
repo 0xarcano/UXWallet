@@ -1,26 +1,24 @@
-version: "3.9"
+version: "3.8"
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: uxwallet-postgres
     environment:
-      POSTGRES_USER: uxwallet
-      POSTGRES_PASSWORD: uxwallet
-      POSTGRES_DB: uxwallet
+      POSTGRES_USER: flywheel
+      POSTGRES_PASSWORD: flywheel
+      POSTGRES_DB: flywheel
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U uxwallet"]
+      test: ["CMD-ONLY", "pg_isready", "-U", "flywheel"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: uxwallet-redis
     ports:
       - "6379:6379"
     volumes:

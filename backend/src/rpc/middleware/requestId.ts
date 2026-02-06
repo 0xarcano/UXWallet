@@ -1,24 +1,21 @@
+import { randomUUID } from 'node:crypto';
+import type { FastifyInstance } from 'fastify';
+
 /**
- * Request ID middleware for tracing and structured logging.
+ * Assigns a unique request ID to every incoming request.
+ * Uses the `x-request-id` header if provided, otherwise generates a UUID.
  */
-import type { Request, Response, NextFunction } from "express";
-import { v4 as uuidv4 } from "uuid";
+export function registerRequestId(app: FastifyInstance): void {
+  app.addHook('onRequest', async (request, reply) => {
+    const incoming = request.headers['x-request-id'];
+    const requestId =
+      typeof incoming === 'string' && incoming.length > 0
+        ? incoming
+        : randomUUID();
 
-declare global {
-  namespace Express {
-    interface Request {
-      requestId?: string;
-    }
-  }
-}
-
-export function requestIdMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
-  const requestId = (req.headers["x-request-id"] as string) || uuidv4();
-  req.requestId = requestId;
-  res.setHeader("X-Request-Id", requestId);
-  next();
+    // Fastify exposes request.id via the genReqId option, but we also
+    // propagate via header for downstream systems.
+    (request as any).requestId = requestId;
+    reply.header('x-request-id', requestId);
+  });
 }

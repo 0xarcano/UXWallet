@@ -1,14 +1,33 @@
-/**
- * Health & version endpoint.
- */
-import { Router } from "express";
+import type { FastifyPluginAsync } from 'fastify';
+import { getPrisma } from '../../lib/prisma.js';
+import { getRedis } from '../../lib/redis.js';
 
-export const healthRouter = Router();
+export const healthRoutes: FastifyPluginAsync = async (app) => {
+  app.get('/health', async (_request, reply) => {
+    const checks: Record<string, string> = {};
 
-healthRouter.get("/", (_req, res) => {
-  res.json({
-    status: "ok",
-    version: "0.1.0",
-    timestamp: new Date().toISOString(),
+    // Postgres
+    try {
+      await getPrisma().$queryRaw`SELECT 1`;
+      checks['postgres'] = 'ok';
+    } catch {
+      checks['postgres'] = 'error';
+    }
+
+    // Redis
+    try {
+      const pong = await getRedis().ping();
+      checks['redis'] = pong === 'PONG' ? 'ok' : 'error';
+    } catch {
+      checks['redis'] = 'error';
+    }
+
+    const allOk = Object.values(checks).every((v) => v === 'ok');
+
+    return reply.status(allOk ? 200 : 503).send({
+      status: allOk ? 'healthy' : 'degraded',
+      timestamp: new Date().toISOString(),
+      checks,
+    });
   });
-});
+};

@@ -1,68 +1,84 @@
-/**
- * EIP-712 delegation signature verification.
- */
-import { recoverTypedDataAddress } from "viem";
+import { verifyMessage, verifyTypedData, type Hex } from 'viem';
+import { EIP712AuthTypes } from '@erc7824/nitrolite';
+import { AppError, ErrorCode } from '../../lib/errors.js';
+import { logger as baseLogger } from '../../lib/logger.js';
 
-/** The typed-data payload the frontend signs during delegation. */
-export interface DelegationPayload {
-  readonly sessionKeyAddress: string;
-  readonly permissionScope: string;
-  readonly ttlSeconds?: number;
-  readonly nonce: number;
-  readonly chainId: number;
+const logger = baseLogger.child({ module: 'delegation:verification' });
+
+export interface DelegationData {
+  userAddress: string;
+  sessionKeyAddress: string;
+  application: string;
+  scope: string;
+  allowances: Array<{ asset: string; amount: string }>;
+  expiresAt: number;
+  signature: string;
 }
 
 /**
- * EIP-712 domain for UXWallet delegation.
+ * Verify that the delegation EIP-712 signature was produced by the
+ * claimed `userAddress`.
+ *
+ * The signed typed-data follows the Yellow/Nitrolite `Policy` schema.
  */
-const DELEGATION_DOMAIN = {
-  name: "UXWallet",
-  version: "1",
-} as const;
+export async function verifyDelegationSignature(
+  data: DelegationData,
+): Promise<boolean> {
+  try {
+    const isValid = await verifyTypedData({
+      address: data.userAddress as Hex,
+      domain: { name: data.application },
+      types: EIP712AuthTypes,
+      primaryType: 'Policy',
+      message: {
+        challenge: '', // Registration doesn't include a server challenge
+        scope: data.scope,
+        wallet: data.userAddress as Hex,
+        session_key: data.sessionKeyAddress as Hex,
+        expires_at: BigInt(data.expiresAt),
+        allowances: data.allowances,
+      },
+      signature: data.signature as Hex,
+    });
 
-/**
- * EIP-712 types for the delegation message.
- */
-const DELEGATION_TYPES = {
-  Delegation: [
-    { name: "sessionKeyAddress", type: "address" },
-    { name: "permissionScope", type: "string" },
-    { name: "ttlSeconds", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "chainId", type: "uint256" },
-  ],
-} as const;
+    if (!isValid) {
+      logger.warn(
+        { userAddress: data.userAddress, sessionKey: data.sessionKeyAddress },
+        'Delegation signature invalid',
+      );
+    }
 
-/**
- * Verify an EIP-712 delegation signature and return the recovered address.
- */
-export async function verifyEip712Delegation(
-  signature: `0x${string}`,
-  payload: DelegationPayload,
-): Promise<`0x${string}`> {
-  const address = await recoverTypedDataAddress({
-    domain: {
-      ...DELEGATION_DOMAIN,
-      chainId: BigInt(payload.chainId),
-    },
-    types: DELEGATION_TYPES,
-    primaryType: "Delegation",
-    message: {
-      sessionKeyAddress: payload.sessionKeyAddress as `0x${string}`,
-      permissionScope: payload.permissionScope,
-      ttlSeconds: BigInt(payload.ttlSeconds ?? 86400),
-      nonce: BigInt(payload.nonce),
-      chainId: BigInt(payload.chainId),
-    },
-    signature,
-  });
-
-  return address;
+    return isValid;
+  } catch (err) {
+    logger.error({ err }, 'Delegation signature verification failed');
+    return false;
+  }
 }
 
 /**
- * Validate that a signature matches EIP-712 format (basic hex check).
+ * Check that a session key is allowed to perform an operation
+ * within its allowance limits.
  */
-export function isValidSignature(sig: string): boolean {
-  return /^0x[0-9a-fA-F]{130}$/.test(sig);
+export function validateAllowance(
+  allowances: Array<{ asset: string; amount: string }>,
+  asset: string,
+  amount: bigint,
+): void {
+  const entry = allowances.find(
+    (a) => a.asset.toLowerCase() === asset.toLowerCase(),
+  );
+
+  if (!entry) {
+    throw new AppError(
+      ErrorCode.SESSION_KEY_INVALID,
+      `Session key has no allowance for asset: ${asset}`,
+    );
+  }
+
+  if (BigInt(entry.amount) < amount) {
+    throw new AppError(
+      ErrorCode.INSUFFICIENT_FUNDS,
+      `Session key allowance exceeded for ${asset}: allowed ${entry.amount}, requested ${amount.toString()}`,
+    );
+  }
 }

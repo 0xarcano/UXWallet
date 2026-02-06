@@ -1,207 +1,211 @@
-/**
- * Delegation Service — manages Persistent Session Keys (EIP-712 delegations).
- *
- * Responsibilities:
- * - Submit delegation: verify EIP-712 signature, store session key with scoped permissions.
- * - Revoke delegation: immediately invalidate a session key.
- * - Query delegation status.
- *
- * Security constraints (from stack_security.md):
- * - Session keys may ONLY authorize Nitrolite (ERC-7824) state updates and LI.FI (ERC-7683) intent fulfillment.
- * - Session keys must NOT authorize transfers to external addresses.
- */
-import { prisma } from "../../lib/prisma.js";
-import { logger } from "../../lib/logger.js";
-import { getKeyStore } from "../../kms/index.js";
+import { getPrisma, type PrismaClient } from '../../lib/prisma.js';
+import { logger as baseLogger } from '../../lib/logger.js';
+import { AppError, ErrorCode } from '../../lib/errors.js';
 import {
-  NotFoundError,
-  ValidationError,
-  ConflictError,
-} from "../../lib/errors.js";
-import { verifyEip712Delegation, type DelegationPayload } from "./verification.js";
-import { config } from "../../config/index.js";
+  verifyDelegationSignature,
+  type DelegationData,
+} from './verification.js';
 
-// Allowed permission scopes
-const ALLOWED_SCOPES = [
-  "nitrolite_state_update",
-  "lifi_intent_fulfillment",
-] as const;
+const logger = baseLogger.child({ module: 'delegation' });
 
-export type PermissionScope = (typeof ALLOWED_SCOPES)[number];
+// ── Service ─────────────────────────────────────────────────────────────────
 
-export interface SubmitDelegationInput {
-  readonly userAddress: string;
-  readonly signature: string;
-  readonly payload: DelegationPayload;
-}
+export class DelegationService {
+  constructor(private readonly prisma: PrismaClient) {}
 
-export interface RevokeDelegationInput {
-  readonly userAddress: string;
-  readonly sessionKeyId: string;
-}
-
-class DelegationService {
   /**
-   * Submit a new delegation.
-   * Verifies the EIP-712 signature, validates scope, then persists the session key.
+   * Register a new session key delegation.
+   * Validates the EIP-712 signature, checks for duplicates/expiry,
+   * and persists to the session_keys table.
    */
-  async submitDelegation(input: SubmitDelegationInput) {
-    const { userAddress, signature, payload } = input;
-
-    // 1. Validate requested scopes
-    const scopes = payload.permissionScope.split(",").map((s) => s.trim());
-    for (const scope of scopes) {
-      if (!ALLOWED_SCOPES.includes(scope as PermissionScope)) {
-        throw new ValidationError(
-          `Invalid permission scope: '${scope}'. Allowed: ${ALLOWED_SCOPES.join(", ")}`,
-        );
-      }
-    }
-
-    // 2. Verify EIP-712 signature recovers to userAddress
-    const recoveredAddress = await verifyEip712Delegation(
-      signature as `0x${string}`,
-      payload,
-    );
-
-    if (recoveredAddress.toLowerCase() !== userAddress.toLowerCase()) {
-      throw new ValidationError(
-        "Signature does not match the claimed userAddress",
+  async registerSessionKey(data: DelegationData) {
+    // ── Validate signature ──────────────────────────────────────────────
+    const isValid = await verifyDelegationSignature(data);
+    if (!isValid) {
+      throw new AppError(
+        ErrorCode.INVALID_SIGNATURE,
+        'Delegation signature verification failed',
       );
     }
 
-    // 3. Check for existing active delegation (prevent duplicates)
-    const existing = await prisma.sessionKey.findFirst({
+    // ── Check expiry ────────────────────────────────────────────────────
+    const expiresAt = new Date(data.expiresAt * 1000);
+    if (expiresAt <= new Date()) {
+      throw new AppError(
+        ErrorCode.SESSION_KEY_EXPIRED,
+        'Session key has already expired',
+      );
+    }
+
+    // ── Upsert (revoke old if exists, create new) ──────────────────────
+    const userAddress = data.userAddress.toLowerCase();
+    const sessionKeyAddr = data.sessionKeyAddress.toLowerCase();
+
+    const existing = await this.prisma.sessionKey.findUnique({
       where: {
-        userAddress: userAddress.toLowerCase(),
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
+        userAddress_sessionKeyAddr: { userAddress, sessionKeyAddr },
       },
     });
 
-    if (existing) {
-      throw new ConflictError(
-        "Active delegation already exists. Revoke it first.",
+    if (existing && existing.status === 'ACTIVE') {
+      // Revoke the old one before creating a new one
+      await this.prisma.sessionKey.update({
+        where: { id: existing.id },
+        data: { status: 'REVOKED', revokedAt: new Date() },
+      });
+      logger.info(
+        { id: existing.id },
+        'Revoked existing session key before re-registration',
       );
     }
 
-    // 4. Determine session key public key from KMS
-    const keyStore = getKeyStore();
-    const signer = await keyStore.getSigner("delegation");
-    const sessionKeyAddress = await signer.getAddress();
-
-    // 5. Persist session key
-    const ttl = payload.ttlSeconds ?? config.sessionKeyDefaultTtlSeconds;
-    const expiresAt = new Date(Date.now() + ttl * 1000);
-
-    const sessionKey = await prisma.sessionKey.create({
+    const sessionKey = await this.prisma.sessionKey.create({
       data: {
-        userAddress: userAddress.toLowerCase(),
-        publicKey: sessionKeyAddress,
-        signature,
-        permissionScope: scopes.join(","),
+        userAddress,
+        sessionKeyAddr,
+        application: data.application,
+        scope: data.scope,
+        allowances: data.allowances,
         expiresAt,
       },
     });
 
     logger.info(
-      { sessionKeyId: sessionKey.id, userAddress, expiresAt },
-      "Delegation submitted",
+      { id: sessionKey.id, userAddress, sessionKeyAddr },
+      'Session key registered',
     );
 
     return {
-      sessionKeyId: sessionKey.id,
-      sessionKeyAddress,
-      permissionScope: sessionKey.permissionScope,
+      id: sessionKey.id,
+      userAddress: sessionKey.userAddress,
+      sessionKeyAddr: sessionKey.sessionKeyAddr,
+      application: sessionKey.application,
+      scope: sessionKey.scope,
       expiresAt: sessionKey.expiresAt.toISOString(),
+      status: sessionKey.status,
     };
   }
 
   /**
-   * Revoke an active delegation immediately.
+   * Revoke a session key.
    */
-  async revokeDelegation(input: RevokeDelegationInput) {
-    const { userAddress, sessionKeyId } = input;
-
-    const sessionKey = await prisma.sessionKey.findFirst({
-      where: {
-        id: sessionKeyId,
-        userAddress: userAddress.toLowerCase(),
-        revokedAt: null,
-      },
-    });
-
-    if (!sessionKey) {
-      throw new NotFoundError("Active session key not found");
-    }
-
-    await prisma.sessionKey.update({
-      where: { id: sessionKeyId },
-      data: { revokedAt: new Date() },
-    });
-
-    logger.info({ sessionKeyId, userAddress }, "Delegation revoked");
-  }
-
-  /**
-   * Get current delegation status for a user.
-   */
-  async getDelegationStatus(userAddress: string) {
-    const activeKey = await prisma.sessionKey.findFirst({
-      where: {
-        userAddress: userAddress.toLowerCase(),
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!activeKey) {
-      return { active: false, sessionKey: null };
-    }
-
-    return {
-      active: true,
-      sessionKey: {
-        id: activeKey.id,
-        publicKey: activeKey.publicKey,
-        permissionScope: activeKey.permissionScope,
-        expiresAt: activeKey.expiresAt.toISOString(),
-        createdAt: activeKey.createdAt.toISOString(),
-      },
-    };
-  }
-
-  /**
-   * Validate that a session key is active and has the required scope.
-   * Used internally by solver/clearnode when co-signing.
-   */
-  async validateSessionKey(
+  async revokeSessionKey(
     userAddress: string,
-    requiredScope: PermissionScope,
-  ) {
-    const key = await prisma.sessionKey.findFirst({
+    sessionKeyAddress: string,
+  ): Promise<void> {
+    const key = await this.prisma.sessionKey.findUnique({
       where: {
-        userAddress: userAddress.toLowerCase(),
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
+        userAddress_sessionKeyAddr: {
+          userAddress: userAddress.toLowerCase(),
+          sessionKeyAddr: sessionKeyAddress.toLowerCase(),
+        },
       },
     });
 
     if (!key) {
-      return { valid: false, reason: "No active session key" };
+      throw AppError.notFound('Session key not found');
     }
 
-    const scopes = key.permissionScope.split(",");
-    if (!scopes.includes(requiredScope)) {
-      return {
-        valid: false,
-        reason: `Session key lacks scope: ${requiredScope}`,
-      };
+    if (key.status !== 'ACTIVE') {
+      throw new AppError(
+        ErrorCode.SESSION_KEY_REVOKED,
+        'Session key is already revoked or expired',
+      );
     }
 
-    return { valid: true, sessionKey: key };
+    await this.prisma.sessionKey.update({
+      where: { id: key.id },
+      data: { status: 'REVOKED', revokedAt: new Date() },
+    });
+
+    logger.info(
+      { id: key.id, userAddress, sessionKeyAddress },
+      'Session key revoked',
+    );
+  }
+
+  /**
+   * List active (non-expired, non-revoked) session keys for a user.
+   */
+  async getActiveKeys(userAddress: string) {
+    const keys = await this.prisma.sessionKey.findMany({
+      where: {
+        userAddress: userAddress.toLowerCase(),
+        status: 'ACTIVE',
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return keys.map((k) => ({
+      id: k.id,
+      sessionKeyAddr: k.sessionKeyAddr,
+      application: k.application,
+      scope: k.scope,
+      allowances: k.allowances,
+      expiresAt: k.expiresAt.toISOString(),
+      createdAt: k.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Validate that a session key is active and not expired.
+   * Returns the session key record if valid, throws otherwise.
+   */
+  async validateSessionKey(
+    userAddress: string,
+    sessionKeyAddr: string,
+  ) {
+    const key = await this.prisma.sessionKey.findUnique({
+      where: {
+        userAddress_sessionKeyAddr: {
+          userAddress: userAddress.toLowerCase(),
+          sessionKeyAddr: sessionKeyAddr.toLowerCase(),
+        },
+      },
+    });
+
+    if (!key) {
+      throw new AppError(
+        ErrorCode.SESSION_KEY_INVALID,
+        'Session key not found',
+      );
+    }
+
+    if (key.status === 'REVOKED') {
+      throw new AppError(
+        ErrorCode.SESSION_KEY_REVOKED,
+        'Session key has been revoked',
+      );
+    }
+
+    if (key.expiresAt <= new Date()) {
+      // Auto-expire
+      await this.prisma.sessionKey.update({
+        where: { id: key.id },
+        data: { status: 'EXPIRED' },
+      });
+      throw new AppError(
+        ErrorCode.SESSION_KEY_EXPIRED,
+        'Session key has expired',
+      );
+    }
+
+    return key;
   }
 }
 
-export const delegationService = new DelegationService();
+// ── Singleton ───────────────────────────────────────────────────────────────
+
+let _service: DelegationService | undefined;
+
+export function getDelegationService(): DelegationService {
+  if (!_service) {
+    _service = new DelegationService(getPrisma());
+  }
+  return _service;
+}
+
+export function resetDelegationService(): void {
+  _service = undefined;
+}

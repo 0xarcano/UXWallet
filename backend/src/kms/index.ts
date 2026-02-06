@@ -1,30 +1,48 @@
+import { generatePrivateKey } from 'viem/accounts';
+import type { Hex } from 'viem';
+import { LocalSigner } from './localSigner.js';
+import type { Signer } from './types.js';
+import { logger } from '../lib/logger.js';
+
+export type { Signer } from './types.js';
+
+let _solverSigner: Signer | undefined;
+
 /**
- * KMS module — factory that returns the configured KeyStore implementation.
+ * Get (or lazily create) the Flywheel Solver signer.
+ *
+ * If `SOLVER_PRIVATE_KEY` is empty, a random key is generated for development.
  */
-import type { KeyStore } from "./types.js";
-import { LocalKeyStore } from "./localSigner.js";
-import { config } from "../config/index.js";
-import { logger } from "../lib/logger.js";
+export function getSolverSigner(): Signer {
+  if (!_solverSigner) {
+    let pk = process.env['SOLVER_PRIVATE_KEY'] as Hex | undefined;
 
-export type { KmsSigner, KeyStore } from "./types.js";
+    if (!pk || pk.length < 10) {
+      pk = generatePrivateKey();
+      logger.warn(
+        'No SOLVER_PRIVATE_KEY configured — generated ephemeral key. DO NOT use in production.',
+      );
+    }
 
-let keyStoreInstance: KeyStore | null = null;
-
-export function getKeyStore(): KeyStore {
-  if (keyStoreInstance) return keyStoreInstance;
-
-  switch (config.kms.provider) {
-    case "local":
-      keyStoreInstance = new LocalKeyStore();
-      break;
-    case "aws":
-      // TODO: Implement AwsKeyStore when moving to production
-      logger.warn("AWS KMS not yet implemented — falling back to local");
-      keyStoreInstance = new LocalKeyStore();
-      break;
-    default:
-      throw new Error(`Unknown KMS provider: ${config.kms.provider}`);
+    _solverSigner = new LocalSigner(pk);
+    logger.info(
+      { address: _solverSigner.getAddress() },
+      'Solver signer initialised',
+    );
   }
 
-  return keyStoreInstance;
+  return _solverSigner;
+}
+
+/**
+ * Create a new random session key signer.
+ */
+export function createSessionKeySigner(): Signer {
+  const pk = generatePrivateKey();
+  return new LocalSigner(pk);
+}
+
+/** Reset cached signer — for tests. */
+export function resetSolverSigner(): void {
+  _solverSigner = undefined;
 }

@@ -1,282 +1,258 @@
-/**
- * ClearNode Service — Virtual Ledger + state management + real-time notifications.
- *
- * Responsibilities:
- * - Maintain the Virtual Ledger (user_balances).
- * - Persist latest signed Nitrolite state (replay protection via sequence numbers).
- * - Emit `bu` (balance update) WebSocket notifications.
- * - Provide balance queries and state proof fetch.
- */
-import { prisma } from "../../lib/prisma.js";
-import { logger } from "../../lib/logger.js";
-import { emitBalanceUpdate } from "../../websocket/server.js";
-import { NotFoundError, ConflictError } from "../../lib/errors.js";
-import { Prisma } from "@prisma/client";
+import { getPrisma, type PrismaClient } from '../../lib/prisma.js';
+import { logger as baseLogger } from '../../lib/logger.js';
+import { AppError, ErrorCode } from '../../lib/errors.js';
+import {
+  getYellowClient,
+  type YellowClient,
+} from '../../integrations/yellow/client.js';
+import { getSolverSigner, type Signer } from '../../kms/index.js';
+import { publishBalanceUpdate } from '../../websocket/server.js';
 
-export interface StateUpdateInput {
-  readonly sessionId: string;
-  readonly sequenceNumber: number;
-  readonly stateData: Record<string, unknown>;
-  readonly signatureA: string; // user signature
-  readonly signatureB: string; // clearnode signature
-  readonly balanceUpdates?: BalanceUpdateEntry[];
-}
+const logger = baseLogger.child({ module: 'clearnode' });
 
-export interface BalanceUpdateEntry {
-  readonly userAddress: string;
-  readonly asset: string;
-  readonly newBalance: string;
-  readonly chainId?: number | null;
-}
+// ── Service ─────────────────────────────────────────────────────────────────
 
-class ClearNodeService {
+export class ClearNodeService {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly yellowClient: YellowClient,
+    private readonly signer: Signer,
+  ) {}
+
   /**
-   * Apply a validated state update atomically:
-   * 1. Verify sequence number (replay protection).
-   * 2. Persist new transaction + update session state.
-   * 3. Update user balances.
-   * 4. Emit `bu` notifications.
+   * Initialize a session: connect to ClearNode, authenticate,
+   * and open a state channel.
    */
-  async applyStateUpdate(input: StateUpdateInput): Promise<void> {
-    const {
-      sessionId,
-      sequenceNumber,
-      stateData,
-      signatureA,
-      signatureB,
-      balanceUpdates,
-    } = input;
+  async initializeSession(params: {
+    userAddress: string;
+    chainId: number;
+    depositAmount: string;
+    asset: string;
+  }): Promise<{ sessionId: string; channelId: string }> {
+    const { userAddress, chainId, depositAmount, asset } = params;
+    const solverAddress = this.signer.getAddress();
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Fetch session and verify sequence
-      const session = await tx.session.findUnique({
-        where: { id: sessionId },
+    // Ensure connected & authenticated
+    if (!this.yellowClient.connected) {
+      await this.yellowClient.connect();
+    }
+    if (!this.yellowClient.authenticated) {
+      await this.yellowClient.authenticate(solverAddress, this.signer);
+    }
+
+    // Create app session via ClearNode RPC
+    const appSession = await this.yellowClient.createAppSession(this.signer, {
+      protocol: 'nitroliterpc',
+      participants: [userAddress.toLowerCase(), solverAddress.toLowerCase()],
+      weights: [100, 0], // User-controlled (for delegation)
+      quorum: 100,
+      challenge: 0,
+      nonce: Date.now(),
+      allocations: [
+        {
+          participant: userAddress.toLowerCase(),
+          asset: asset.toLowerCase(),
+          amount: depositAmount,
+        },
+        {
+          participant: solverAddress.toLowerCase(),
+          asset: asset.toLowerCase(),
+          amount: '0',
+        },
+      ],
+    });
+
+    // Persist session to DB
+    const session = await this.prisma.session.create({
+      data: {
+        channelId: appSession.appSessionId,
+        participantA: userAddress.toLowerCase(),
+        participantB: solverAddress.toLowerCase(),
+        chainId,
+        status: 'OPEN',
+        totalLocked: depositAmount,
+        appSessionId: appSession.appSessionId,
+        latestState: {
+          allocations: [
+            { participant: userAddress.toLowerCase(), asset, amount: depositAmount },
+            { participant: solverAddress.toLowerCase(), asset, amount: '0' },
+          ],
+        },
+      },
+    });
+
+    // Record initial transaction
+    await this.prisma.transaction.create({
+      data: {
+        sessionId: session.id,
+        nonce: 0,
+        stateData: session.latestState!,
+        signature: '',
+        type: 'DEPOSIT',
+      },
+    });
+
+    // Update user balance (unified)
+    await this.prisma.userBalance.upsert({
+      where: {
+        userAddress_asset_chainId: {
+          userAddress: userAddress.toLowerCase(),
+          asset: asset.toLowerCase(),
+          chainId: null as any,
+        },
+      },
+      update: {
+        balance: depositAmount, // In MVP, set directly
+      },
+      create: {
+        userAddress: userAddress.toLowerCase(),
+        asset: asset.toLowerCase(),
+        balance: depositAmount,
+        chainId: null,
+      },
+    });
+
+    // Emit balance update
+    await publishBalanceUpdate({
+      userAddress: userAddress.toLowerCase(),
+      asset: asset.toLowerCase(),
+      balance: depositAmount,
+      chainId,
+    });
+
+    logger.info(
+      { sessionId: session.id, channelId: session.channelId, userAddress },
+      'Session initialised',
+    );
+
+    return {
+      sessionId: session.id,
+      channelId: session.channelId,
+    };
+  }
+
+  /**
+   * Co-sign a state update from the user (ClearNode responsibility).
+   */
+  async submitStateUpdate(params: {
+    channelId: string;
+    allocations: Array<{
+      participant: string;
+      asset: string;
+      amount: string;
+    }>;
+  }): Promise<void> {
+    const session = await this.prisma.session.findUnique({
+      where: { channelId: params.channelId },
+    });
+
+    if (!session) {
+      throw AppError.notFound('Session not found');
+    }
+    if (session.status !== 'OPEN') {
+      throw new AppError(ErrorCode.SESSION_EXPIRED, 'Session is not open');
+    }
+
+    const newNonce = session.latestNonce + 1;
+
+    // Submit to ClearNode
+    if (session.appSessionId) {
+      await this.yellowClient.submitAppState(
+        this.signer,
+        session.appSessionId,
+        params.allocations,
+      );
+    }
+
+    // Persist state update
+    await this.prisma.$transaction(async (tx) => {
+      await tx.session.update({
+        where: { id: session.id },
+        data: {
+          latestState: { allocations: params.allocations },
+          latestNonce: newNonce,
+        },
       });
 
-      if (!session) {
-        throw new NotFoundError(`Session not found: ${sessionId}`);
-      }
-
-      if (session.status !== "OPEN") {
-        throw new ConflictError(`Session is not open: ${session.status}`);
-      }
-
-      if (sequenceNumber !== session.sequenceNumber + 1) {
-        throw new ConflictError(
-          `Invalid sequence number. Expected ${session.sequenceNumber + 1}, got ${sequenceNumber}`,
-        );
-      }
-
-      // 2. Create transaction record
       await tx.transaction.create({
         data: {
-          sessionId,
-          sequenceNumber,
-          type: "STATE_UPDATE",
-          stateData: stateData as Prisma.InputJsonValue,
-          signatureA,
-          signatureB,
+          sessionId: session.id,
+          nonce: newNonce,
+          stateData: { allocations: params.allocations },
+          signature: '',
+          type: 'STATE_UPDATE',
         },
       });
+    });
 
-      // 3. Update session with latest state
-      const stateHash = computeStateHash(stateData);
-      await tx.session.update({
-        where: { id: sessionId },
-        data: {
-          sequenceNumber,
-          latestStateHash: stateHash,
-          latestStateSig: signatureB, // ClearNode's co-signature
-          latestStateData: stateData as Prisma.InputJsonValue,
-        },
+    logger.info(
+      { channelId: params.channelId, nonce: newNonce },
+      'State update submitted',
+    );
+  }
+
+  /**
+   * Fetch the on-chain / ClearNode balances for a participant.
+   */
+  async getLedgerBalances(
+    participant: string,
+  ): Promise<Array<{ asset: string; amount: string }>> {
+    if (!this.yellowClient.authenticated) {
+      logger.warn('ClearNode not authenticated, returning DB balances');
+      const dbBalances = await this.prisma.userBalance.findMany({
+        where: { userAddress: participant.toLowerCase() },
       });
-
-      // 4. Update user balances if provided
-      if (balanceUpdates && balanceUpdates.length > 0) {
-        for (const update of balanceUpdates) {
-          const addr = update.userAddress.toLowerCase();
-          const cid = update.chainId ?? undefined;
-
-          // findFirst + create/update pattern (compound unique includes nullable chainId)
-          const existing = await tx.userBalance.findFirst({
-            where: { userAddress: addr, asset: update.asset, chainId: cid ?? null },
-          });
-
-          if (existing) {
-            await tx.userBalance.update({
-              where: { id: existing.id },
-              data: { balance: update.newBalance },
-            });
-          } else {
-            await tx.userBalance.create({
-              data: {
-                userAddress: addr,
-                asset: update.asset,
-                balance: update.newBalance,
-                chainId: cid,
-              },
-            });
-          }
-        }
-      }
-    });
-
-    // 5. Emit `bu` notifications (outside transaction for speed)
-    if (balanceUpdates) {
-      const addressesNotified = new Set<string>();
-      for (const update of balanceUpdates) {
-        const addr = update.userAddress.toLowerCase();
-        if (!addressesNotified.has(addr)) {
-          addressesNotified.add(addr);
-          emitBalanceUpdate(addr, {
-            sessionId,
-            sequenceNumber,
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
+      return dbBalances.map((b) => ({ asset: b.asset, amount: b.balance }));
     }
 
-    logger.info({ sessionId, sequenceNumber }, "State update applied");
+    return this.yellowClient.getLedgerBalances(this.signer, participant);
   }
 
   /**
-   * Get unified balances for a user (aggregated across all chains).
+   * Close a session and trigger on-chain withdrawal.
    */
-  async getUnifiedBalances(userAddress: string) {
-    const balances = await prisma.userBalance.findMany({
-      where: { userAddress: userAddress.toLowerCase() },
-      orderBy: { asset: "asc" },
+  async closeSession(channelId: string): Promise<void> {
+    const session = await this.prisma.session.findUnique({
+      where: { channelId },
     });
 
-    // Group by asset: unified (chainId=null) + per-chain breakdown
-    const unified: Record<string, { unified: string; chains: Record<number, string> }> = {};
+    if (!session) throw AppError.notFound('Session not found');
 
-    for (const b of balances) {
-      if (!unified[b.asset]) {
-        unified[b.asset] = { unified: "0", chains: {} };
-      }
-      if (b.chainId === null) {
-        unified[b.asset].unified = b.balance;
-      } else {
-        unified[b.asset].chains[b.chainId] = b.balance;
-      }
+    // Close on ClearNode
+    if (session.appSessionId && this.yellowClient.authenticated) {
+      const state = session.latestState as any;
+      await this.yellowClient.closeAppSession(
+        this.signer,
+        session.appSessionId,
+        state?.allocations ?? [],
+      );
     }
 
-    return unified;
-  }
-
-  /**
-   * Get unified balance for a specific asset.
-   */
-  async getUnifiedBalance(userAddress: string, asset: string) {
-    const balances = await prisma.userBalance.findMany({
-      where: { userAddress: userAddress.toLowerCase(), asset },
+    // Update DB
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { status: 'CLOSED' },
     });
 
-    if (balances.length === 0) {
-      return { asset, unified: "0", chains: {} };
-    }
-
-    const result: { asset: string; unified: string; chains: Record<number, string> } = {
-      asset,
-      unified: "0",
-      chains: {},
-    };
-
-    for (const b of balances) {
-      if (b.chainId === null) {
-        result.unified = b.balance;
-      } else {
-        result.chains[b.chainId] = b.balance;
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Get latest signed state proof for a user (for Force Withdrawal / Adjudicator).
-   */
-  async getLatestStateProof(userAddress: string) {
-    const sessions = await prisma.session.findMany({
-      where: {
-        participantA: userAddress.toLowerCase(),
-        latestStateData: { not: Prisma.DbNull },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    });
-
-    if (sessions.length === 0) {
-      throw new NotFoundError("No signed state found for this address");
-    }
-
-    const session = sessions[0];
-    return {
-      channelId: session.channelId,
-      sequenceNumber: session.sequenceNumber,
-      stateHash: session.latestStateHash,
-      stateSignature: session.latestStateSig,
-      stateData: session.latestStateData,
-      updatedAt: session.updatedAt.toISOString(),
-    };
-  }
-
-  /**
-   * Get active sessions for a user.
-   */
-  async getActiveSessions(userAddress: string) {
-    const sessions = await prisma.session.findMany({
-      where: {
-        participantA: userAddress.toLowerCase(),
-        status: "OPEN",
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return sessions.map((s) => ({
-      id: s.id,
-      channelId: s.channelId,
-      status: s.status,
-      sequenceNumber: s.sequenceNumber,
-      createdAt: s.createdAt.toISOString(),
-      updatedAt: s.updatedAt.toISOString(),
-    }));
-  }
-
-  /**
-   * Create or open a new Nitrolite session.
-   */
-  async openSession(channelId: string, participantA: string, participantB: string) {
-    const session = await prisma.session.create({
-      data: {
-        channelId,
-        participantA: participantA.toLowerCase(),
-        participantB: participantB.toLowerCase(),
-        status: "OPEN",
-        sequenceNumber: 0,
-      },
-    });
-
-    logger.info({ sessionId: session.id, channelId }, "Session opened");
-    return session;
+    logger.info({ channelId }, 'Session closed');
   }
 }
 
-/**
- * Simple state hash computation (placeholder — real impl would keccak256 the canonical encoding).
- */
-function computeStateHash(stateData: Record<string, unknown>): string {
-  // In production, use keccak256 over canonical ABI-encoded state
-  const serialized = JSON.stringify(stateData, Object.keys(stateData).sort());
-  // Simple hash placeholder
-  let hash = 0;
-  for (let i = 0; i < serialized.length; i++) {
-    const char = serialized.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
+// ── Singleton ───────────────────────────────────────────────────────────────
+
+let _service: ClearNodeService | undefined;
+
+export function getClearNodeService(): ClearNodeService {
+  if (!_service) {
+    _service = new ClearNodeService(
+      getPrisma(),
+      getYellowClient(),
+      getSolverSigner(),
+    );
   }
-  return `0x${Math.abs(hash).toString(16).padStart(64, "0")}`;
+  return _service;
 }
 
-export const clearNodeService = new ClearNodeService();
+export function resetClearNodeService(): void {
+  _service = undefined;
+}

@@ -1,36 +1,53 @@
-/**
- * State RPC routes — query latest signed Nitrolite state proofs.
- */
-import { Router } from "express";
-import { clearNodeService } from "../../services/clearnode/index.js";
-import { validateAddress } from "../../utils/validation.js";
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { getPrisma } from '../../lib/prisma.js';
+import { ethereumAddress, hexString } from '../../utils/validation.js';
+import { AppError } from '../../lib/errors.js';
 
-export const stateRouter = Router();
+const channelQuery = z.object({ channelId: hexString });
+const userQuery = z.object({ userAddress: ethereumAddress });
 
-/**
- * GET /api/state/proof/:address
- * Returns the latest signed state proof for a user (for Force Withdrawal / Adjudicator recovery).
- */
-stateRouter.get("/proof/:address", async (req, res, next) => {
-  try {
-    const address = validateAddress(req.params.address, "address");
-    const proof = await clearNodeService.getLatestStateProof(address);
-    res.json({ data: proof });
-  } catch (err) {
-    next(err);
-  }
-});
+export const stateRoutes: FastifyPluginAsync = async (app) => {
+  /**
+   * GET /api/state/channel/:channelId
+   *
+   * Returns the latest persisted state for a single channel.
+   */
+  app.get('/state/channel/:channelId', async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const parsed = channelQuery.safeParse({ channelId });
+    if (!parsed.success) {
+      throw AppError.validation('Invalid channel ID');
+    }
 
-/**
- * GET /api/state/sessions/:address
- * Returns active Nitrolite session metadata for a user.
- */
-stateRouter.get("/sessions/:address", async (req, res, next) => {
-  try {
-    const address = validateAddress(req.params.address, "address");
-    const sessions = await clearNodeService.getActiveSessions(address);
-    res.json({ data: sessions });
-  } catch (err) {
-    next(err);
-  }
-});
+    const session = await getPrisma().session.findUnique({
+      where: { channelId: parsed.data.channelId },
+      include: { transactions: { orderBy: { nonce: 'desc' }, take: 1 } },
+    });
+
+    if (!session) throw AppError.notFound('Session not found');
+
+    return reply.send({ session });
+  });
+
+  /**
+   * GET /api/state/sessions?userAddress=0x…
+   *
+   * Returns all sessions for a user.
+   */
+  app.get('/state/sessions', async (request, reply) => {
+    const parsed = userQuery.safeParse(request.query);
+    if (!parsed.success) {
+      throw AppError.validation('Invalid query', {
+        issues: parsed.error.issues,
+      });
+    }
+
+    const sessions = await getPrisma().session.findMany({
+      where: { participantA: parsed.data.userAddress.toLowerCase() },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return reply.send({ sessions });
+  });
+};

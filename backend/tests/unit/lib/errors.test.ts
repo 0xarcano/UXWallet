@@ -1,60 +1,83 @@
-/**
- * Unit tests for domain error classes.
- */
-import { describe, it, expect } from "vitest";
-import {
-  AppError,
-  ValidationError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  ConflictError,
-  RateLimitError,
-} from "../../../src/lib/errors.js";
+import { describe, it, expect } from 'vitest';
+import { AppError, ErrorCode, isAppError } from '../../../src/lib/errors.js';
 
-describe("Error classes", () => {
-  it("AppError has correct defaults", () => {
-    const err = new AppError("test");
-    expect(err.message).toBe("test");
-    expect(err.statusCode).toBe(500);
-    expect(err.code).toBe("INTERNAL_ERROR");
-    expect(err.name).toBe("AppError");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("ValidationError is 400", () => {
-    const err = new ValidationError("bad input");
+describe('AppError', () => {
+  it('creates with correct code and default status', () => {
+    const err = new AppError(ErrorCode.VALIDATION_ERROR, 'bad input');
+    expect(err.code).toBe(ErrorCode.VALIDATION_ERROR);
     expect(err.statusCode).toBe(400);
-    expect(err.code).toBe("VALIDATION_ERROR");
+    expect(err.message).toBe('bad input');
+    expect(err.name).toBe('AppError');
   });
 
-  it("AuthenticationError is 401", () => {
-    const err = new AuthenticationError();
-    expect(err.statusCode).toBe(401);
-    expect(err.code).toBe("AUTHENTICATION_ERROR");
+  it('allows a custom statusCode override', () => {
+    const err = new AppError(ErrorCode.INTERNAL_ERROR, 'custom', 503);
+    expect(err.statusCode).toBe(503);
   });
 
-  it("AuthorizationError is 403", () => {
-    const err = new AuthorizationError();
-    expect(err.statusCode).toBe(403);
-    expect(err.code).toBe("AUTHORIZATION_ERROR");
+  it('serialises to JSON correctly', () => {
+    const err = new AppError(ErrorCode.NOT_FOUND, 'gone', undefined, {
+      id: '123',
+    });
+    const json = err.toJSON();
+    expect(json).toEqual({
+      error: {
+        code: 'NOT_FOUND',
+        message: 'gone',
+        details: { id: '123' },
+      },
+    });
   });
 
-  it("NotFoundError is 404", () => {
-    const err = new NotFoundError();
-    expect(err.statusCode).toBe(404);
-    expect(err.code).toBe("NOT_FOUND");
+  it('omits details when undefined', () => {
+    const json = new AppError(ErrorCode.TIMEOUT, 'slow').toJSON();
+    expect(json.error).not.toHaveProperty('details');
   });
 
-  it("ConflictError is 409", () => {
-    const err = new ConflictError();
-    expect(err.statusCode).toBe(409);
-    expect(err.code).toBe("CONFLICT");
+  describe('factory methods', () => {
+    it('validation → 400', () => {
+      const err = AppError.validation('nope');
+      expect(err.statusCode).toBe(400);
+      expect(err.code).toBe(ErrorCode.VALIDATION_ERROR);
+    });
+
+    it('notFound → 404', () => {
+      expect(AppError.notFound('x').statusCode).toBe(404);
+    });
+
+    it('unauthorized → 401', () => {
+      expect(AppError.unauthorized('x').statusCode).toBe(401);
+    });
+
+    it('internal → 500', () => {
+      expect(AppError.internal('x').statusCode).toBe(500);
+    });
+
+    it('timeout → 504', () => {
+      expect(AppError.timeout('x').statusCode).toBe(504);
+    });
+
+    it('insufficientFunds → 400', () => {
+      expect(AppError.insufficientFunds('x').statusCode).toBe(400);
+    });
+
+    it('insufficientLiquidity → 503', () => {
+      expect(AppError.insufficientLiquidity('x').statusCode).toBe(503);
+    });
+  });
+});
+
+describe('isAppError', () => {
+  it('returns true for AppError instances', () => {
+    expect(isAppError(new AppError(ErrorCode.INTERNAL_ERROR, 'x'))).toBe(true);
   });
 
-  it("RateLimitError is 429", () => {
-    const err = new RateLimitError();
-    expect(err.statusCode).toBe(429);
-    expect(err.code).toBe("RATE_LIMIT_EXCEEDED");
+  it('returns false for plain Error', () => {
+    expect(isAppError(new Error('x'))).toBe(false);
+  });
+
+  it('returns false for non-errors', () => {
+    expect(isAppError('string')).toBe(false);
+    expect(isAppError(null)).toBe(false);
   });
 });

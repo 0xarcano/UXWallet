@@ -1,44 +1,47 @@
-/**
- * Local KMS signer for development — uses a private key from env.
- */
-import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
-import type { KmsSigner, KeyStore } from "./types.js";
-import { config } from "../config/index.js";
-import { logger } from "../lib/logger.js";
+import {
+  privateKeyToAccount,
+  type PrivateKeyAccount,
+} from 'viem/accounts';
+import type { Hex } from 'viem';
+import type { Signer } from './types.js';
 
-class LocalSigner implements KmsSigner {
+/**
+ * Local (in-process) signer backed by a raw private key.
+ * Suitable for development and testnet MVPs.
+ *
+ * For production, replace with an AWS KMS / HashiCorp Vault implementation
+ * that satisfies the same `Signer` interface.
+ */
+export class LocalSigner implements Signer {
   private readonly account: PrivateKeyAccount;
 
-  constructor(privateKey: `0x${string}`) {
+  constructor(privateKey: Hex) {
     this.account = privateKeyToAccount(privateKey);
   }
 
-  async sign(messageHash: `0x${string}`): Promise<`0x${string}`> {
-    const signature = await this.account.signMessage({
-      message: { raw: messageHash },
-    });
-    return signature;
-  }
-
-  async getAddress(): Promise<`0x${string}`> {
+  getAddress(): string {
     return this.account.address;
   }
-}
 
-export class LocalKeyStore implements KeyStore {
-  private readonly signer: LocalSigner;
-
-  constructor() {
-    const pk = config.kms.localPrivateKey;
-    if (!pk) {
-      throw new Error("KMS_LOCAL_PRIVATE_KEY is required when KMS_PROVIDER=local");
-    }
-    this.signer = new LocalSigner(pk as `0x${string}`);
-    logger.info("LocalKeyStore initialized (development mode)");
+  async signMessage(message: Uint8Array | string): Promise<string> {
+    const raw = typeof message === 'string' ? message : ({ raw: message } as const);
+    return this.account.signMessage({ message: raw });
   }
 
-  async getSigner(_scope: string): Promise<KmsSigner> {
-    // In local mode, all scopes share the same key
-    return this.signer;
+  async signRaw(hash: `0x${string}`): Promise<string> {
+    return this.account.sign({ hash });
+  }
+
+  async signTypedData(
+    domain: Record<string, unknown>,
+    types: Record<string, Array<{ name: string; type: string }>>,
+    value: Record<string, unknown>,
+  ): Promise<string> {
+    return this.account.signTypedData({
+      domain: domain as any,
+      types: types as any,
+      primaryType: Object.keys(types).find((k) => k !== 'EIP712Domain') ?? '',
+      message: value as any,
+    });
   }
 }

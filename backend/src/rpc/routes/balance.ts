@@ -1,37 +1,41 @@
-/**
- * Balance RPC routes — query unified balance per user/asset.
- */
-import { Router } from "express";
-import { clearNodeService } from "../../services/clearnode/index.js";
-import { validateAddress } from "../../utils/validation.js";
+import type { FastifyPluginAsync } from 'fastify';
+import { getPrisma } from '../../lib/prisma.js';
+import { balanceQuerySchema } from '../../utils/validation.js';
+import { AppError } from '../../lib/errors.js';
 
-export const balanceRouter = Router();
+export const balanceRoutes: FastifyPluginAsync = async (app) => {
+  /**
+   * GET /api/balance?userAddress=0x…&asset=eth
+   *
+   * Returns unified balances for the user, optionally filtered by asset.
+   */
+  app.get('/balance', async (request, reply) => {
+    const parsed = balanceQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      throw AppError.validation('Invalid balance query', {
+        issues: parsed.error.issues,
+      });
+    }
 
-/**
- * GET /api/balance/:address
- * Returns the unified balance for all assets held by the given address.
- */
-balanceRouter.get("/:address", async (req, res, next) => {
-  try {
-    const address = validateAddress(req.params.address, "address");
-    const balances = await clearNodeService.getUnifiedBalances(address);
-    res.json({ data: balances });
-  } catch (err) {
-    next(err);
-  }
-});
+    const { userAddress, asset } = parsed.data;
+    const prisma = getPrisma();
 
-/**
- * GET /api/balance/:address/:asset
- * Returns the unified balance for a specific asset.
- */
-balanceRouter.get("/:address/:asset", async (req, res, next) => {
-  try {
-    const address = validateAddress(req.params.address, "address");
-    const { asset } = req.params;
-    const balance = await clearNodeService.getUnifiedBalance(address, asset);
-    res.json({ data: balance });
-  } catch (err) {
-    next(err);
-  }
-});
+    const where: Record<string, unknown> = {
+      userAddress: userAddress.toLowerCase(),
+    };
+    if (asset) {
+      where['asset'] = asset.toLowerCase();
+    }
+
+    const balances = await prisma.userBalance.findMany({ where });
+
+    return reply.send({
+      userAddress,
+      balances: balances.map((b) => ({
+        asset: b.asset,
+        balance: b.balance,
+        chainId: b.chainId,
+      })),
+    });
+  });
+};

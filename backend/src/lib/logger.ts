@@ -1,20 +1,18 @@
-/**
- * Centralized structured logger (Pino).
- * All modules should import `logger` from here.
- */
-import pino from "pino";
-import { config } from "../config/index.js";
+import pino from 'pino';
 
-export const logger = pino({
-  level: config.logLevel,
-  transport:
-    config.nodeEnv === "development"
-      ? { target: "pino/file", options: { destination: 1 } }
-      : undefined,
-  formatters: {
-    level(label) {
-      return { level: label };
-    },
-  },
-  timestamp: pino.stdTimeFunctions.isoTime,
-});
+export type Logger = pino.Logger;
+
+export function createLogger(name?: string, level?: string): Logger {
+  const logLevel = level ?? process.env['LOG_LEVEL'] ?? 'info';
+  const isDev = process.env['NODE_ENV'] !== 'production';
+
+  return pino({
+    name: name ?? 'flywheel',
+    level: logLevel,
+    ...(isDev
+      ? { transport: { target: 'pino-pretty', options: { colorize: true } } }
+      : {}),
+  });
+}
+
+export const logger = createLogger();

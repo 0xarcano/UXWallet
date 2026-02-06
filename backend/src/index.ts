@@ -1,53 +1,36 @@
-/**
- * UXWallet Backend — Entry point.
- *
- * Boots Express HTTP server + WebSocket server, connects to Postgres & Redis,
- * and starts all background services (solver, rebalancer, etc.).
- */
-import { config } from "./config/index.js";
-import { logger } from "./lib/logger.js";
-import { connectDatabase, disconnectDatabase } from "./lib/prisma.js";
-import { connectRedis, disconnectRedis } from "./lib/redis.js";
-import { createApp } from "./app.js";
-import { createWebSocketServer } from "./websocket/server.js";
-import http from "node:http";
+import { buildApp } from './app.js';
+import { getConfig } from './config/index.js';
+import { logger } from './lib/logger.js';
+import { disconnectPrisma } from './lib/prisma.js';
+import { disconnectRedis } from './lib/redis.js';
 
-async function main(): Promise<void> {
-  logger.info(
-    { env: config.nodeEnv, port: config.port },
-    "Starting UXWallet Backend…",
-  );
+async function main() {
+  const config = getConfig();
+  const app = await buildApp();
 
-  // Connect infrastructure
-  await connectDatabase();
-  await connectRedis();
-
-  // Create Express app + HTTP server
-  const app = createApp();
-  const server = http.createServer(app);
-
-  // Attach WebSocket server
-  createWebSocketServer(server);
-
-  // Start listening
-  server.listen(config.port, () => {
-    logger.info({ port: config.port }, "Server listening");
-  });
-
-  // Graceful shutdown
+  // ── Graceful shutdown ───────────────────────────────────────────────────
   const shutdown = async (signal: string) => {
-    logger.info({ signal }, "Shutting down…");
-    server.close();
+    logger.info({ signal }, 'Shutting down…');
+    await app.close();
+    await disconnectPrisma();
     await disconnectRedis();
-    await disconnectDatabase();
     process.exit(0);
   };
 
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+
+  // ── Start ───────────────────────────────────────────────────────────────
+  try {
+    await app.listen({ port: config.PORT, host: config.HOST });
+    logger.info(
+      { port: config.PORT, host: config.HOST, env: config.NODE_ENV },
+      'Flywheel backend started',
+    );
+  } catch (err) {
+    logger.fatal({ err }, 'Failed to start server');
+    process.exit(1);
+  }
 }
 
-main().catch((err) => {
-  logger.fatal({ err }, "Failed to start");
-  process.exit(1);
-});
+main();

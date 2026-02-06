@@ -1,60 +1,91 @@
-/**
- * Withdrawal RPC routes — create and query withdrawal requests.
- */
-import { Router } from "express";
-import { rebalancerService } from "../../services/rebalancer/index.js";
-import { validateAddress, validatePositiveAmount, validateChainId } from "../../utils/validation.js";
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { getPrisma } from '../../lib/prisma.js';
+import {
+  withdrawalRequestSchema,
+  ethereumAddress,
+  hexString,
+} from '../../utils/validation.js';
+import { AppError, ErrorCode } from '../../lib/errors.js';
+import { publishBalanceUpdate } from '../../websocket/server.js';
+import { strictRateLimit } from '../middleware/rateLimiter.js';
 
-export const withdrawalRouter = Router();
+const statusQuery = z.object({ id: z.string().uuid() });
 
-/**
- * POST /api/withdrawal/request
- * Create a new withdrawal request.
- */
-withdrawalRouter.post("/request", async (req, res, next) => {
-  try {
-    const { userAddress, asset, amount, destinationChainId } = req.body;
-    validateAddress(userAddress, "userAddress");
-    validatePositiveAmount(amount, "amount");
-    validateChainId(destinationChainId, "destinationChainId");
+export const withdrawalRoutes: FastifyPluginAsync = async (app) => {
+  /**
+   * POST /api/withdrawal/request
+   *
+   * Initiate a withdrawal from the aggregated pool.
+   */
+  app.post(
+    '/withdrawal/request',
+    strictRateLimit,
+    async (request, reply) => {
+      const parsed = withdrawalRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw AppError.validation('Invalid withdrawal request', {
+          issues: parsed.error.issues,
+        });
+      }
 
-    const result = await rebalancerService.createWithdrawalRequest({
-      userAddress,
-      asset,
-      amount,
-      destinationChainId,
+      const { userAddress, asset, amount, chainId } = parsed.data;
+      const prisma = getPrisma();
+
+      // ── Check user balance ────────────────────────────────────────────
+      const balance = await prisma.userBalance.findFirst({
+        where: {
+          userAddress: userAddress.toLowerCase(),
+          asset: asset.toLowerCase(),
+        },
+      });
+
+      if (!balance || BigInt(balance.balance) < BigInt(amount)) {
+        throw AppError.insufficientFunds(
+          `Insufficient ${asset} balance for withdrawal`,
+        );
+      }
+
+      // ── Create withdrawal request ─────────────────────────────────────
+      const withdrawal = await prisma.withdrawalRequest.create({
+        data: {
+          userAddress: userAddress.toLowerCase(),
+          asset: asset.toLowerCase(),
+          amount,
+          chainId,
+        },
+      });
+
+      // Emit a balance update notification
+      await publishBalanceUpdate({
+        userAddress: userAddress.toLowerCase(),
+        asset: asset.toLowerCase(),
+        balance: (BigInt(balance.balance) - BigInt(amount)).toString(),
+        chainId,
+      });
+
+      return reply.status(201).send({ withdrawal });
+    },
+  );
+
+  /**
+   * GET /api/withdrawal/status/:id
+   *
+   * Check the status of a withdrawal request.
+   */
+  app.get('/withdrawal/status/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = statusQuery.safeParse({ id });
+    if (!parsed.success) {
+      throw AppError.validation('Invalid withdrawal ID');
+    }
+
+    const withdrawal = await getPrisma().withdrawalRequest.findUnique({
+      where: { id: parsed.data.id },
     });
 
-    res.status(201).json({ data: result });
-  } catch (err) {
-    next(err);
-  }
-});
+    if (!withdrawal) throw AppError.notFound('Withdrawal request not found');
 
-/**
- * GET /api/withdrawal/status/:id
- * Query status of a withdrawal request.
- */
-withdrawalRouter.get("/status/:id", async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const status = await rebalancerService.getWithdrawalStatus(id);
-    res.json({ data: status });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * GET /api/withdrawal/history/:address
- * List withdrawal history for a user.
- */
-withdrawalRouter.get("/history/:address", async (req, res, next) => {
-  try {
-    const address = validateAddress(req.params.address, "address");
-    const history = await rebalancerService.getWithdrawalHistory(address);
-    res.json({ data: history });
-  } catch (err) {
-    next(err);
-  }
-});
+    return reply.send({ withdrawal });
+  });
+};

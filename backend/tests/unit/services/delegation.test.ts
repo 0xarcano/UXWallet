@@ -1,231 +1,209 @@
-/**
- * Unit tests for the Delegation Service.
- *
- * Tests delegation lifecycle: creation, usage, expiration, revocation.
- * Tests scoped permissions: ensure session keys cannot authorize transfers to external addresses.
- */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { delegationService } from "../../../src/services/delegation/index.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { DelegationService } from '../../../src/services/delegation/index.js';
 
-// Mock Prisma
-const mockCreate = vi.fn();
-const mockFindFirst = vi.fn();
-const mockUpdate = vi.fn();
+// ── Mock Prisma ─────────────────────────────────────────────────────────────
 
-vi.mock("../../../src/lib/prisma.js", () => ({
-  prisma: {
+function createMockPrisma() {
+  return {
     sessionKey: {
-      create: (...args: unknown[]) => mockCreate(...args),
-      findFirst: (...args: unknown[]) => mockFindFirst(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
-  },
+  } as any;
+}
+
+// ── Mock verification ───────────────────────────────────────────────────────
+
+vi.mock('../../../src/services/delegation/verification.js', () => ({
+  verifyDelegationSignature: vi.fn().mockResolvedValue(true),
+  validateAllowance: vi.fn(),
 }));
 
-vi.mock("../../../src/lib/logger.js", () => ({
-  logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+describe('DelegationService', () => {
+  let service: DelegationService;
+  let prisma: ReturnType<typeof createMockPrisma>;
 
-vi.mock("../../../src/config/index.js", () => ({
-  config: {
-    sessionKeyDefaultTtlSeconds: 86400,
-    kms: {
-      provider: "local",
-      localPrivateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    },
-    logLevel: "silent",
-    nodeEnv: "test",
-  },
-}));
+  const validData = {
+    userAddress: '0x' + 'a'.repeat(40),
+    sessionKeyAddress: '0x' + 'b'.repeat(40),
+    application: 'Flywheel',
+    scope: 'console',
+    allowances: [{ asset: 'usdc', amount: '1000000' }],
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    signature: '0x' + 'ab'.repeat(32),
+  };
 
-vi.mock("../../../src/kms/index.js", () => ({
-  getKeyStore: () => ({
-    getSigner: vi.fn().mockResolvedValue({
-      getAddress: vi.fn().mockResolvedValue("0x1234567890abcdef1234567890abcdef12345678"),
-      sign: vi.fn().mockResolvedValue("0x" + "ab".repeat(65)),
-    }),
-  }),
-}));
-
-vi.mock("../../../src/services/delegation/verification.js", () => ({
-  verifyEip712Delegation: vi.fn().mockResolvedValue(
-    "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
-  ),
-  isValidSignature: vi.fn().mockReturnValue(true),
-}));
-
-describe("DelegationService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    prisma = createMockPrisma();
+    service = new DelegationService(prisma);
   });
 
-  describe("submitDelegation", () => {
-    it("rejects invalid permission scopes", async () => {
-      await expect(
-        delegationService.submitDelegation({
-          userAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-          signature: "0x" + "ab".repeat(65),
-          payload: {
-            sessionKeyAddress: "0x1234567890abcdef1234567890abcdef12345678",
-            permissionScope: "transfer_external",
-            nonce: 1,
-            chainId: 1,
-          },
-        }),
-      ).rejects.toThrow("Invalid permission scope");
+  describe('registerSessionKey', () => {
+    it('creates a new session key', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue(null);
+      prisma.sessionKey.create.mockResolvedValue({
+        id: 'key-1',
+        userAddress: validData.userAddress.toLowerCase(),
+        sessionKeyAddr: validData.sessionKeyAddress.toLowerCase(),
+        application: validData.application,
+        scope: validData.scope,
+        expiresAt: new Date(validData.expiresAt * 1000),
+        status: 'ACTIVE',
+      });
+
+      const result = await service.registerSessionKey(validData);
+
+      expect(result.id).toBe('key-1');
+      expect(result.status).toBe('ACTIVE');
+      expect(prisma.sessionKey.create).toHaveBeenCalled();
     });
 
-    it("rejects when signature does not match userAddress", async () => {
-      const mod = await import("../../../src/services/delegation/verification.js");
-      const mockVerify = mod.verifyEip712Delegation as ReturnType<typeof vi.fn>;
-      mockVerify.mockResolvedValueOnce("0x0000000000000000000000000000000000000001");
-
-      await expect(
-        delegationService.submitDelegation({
-          userAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-          signature: "0x" + "ab".repeat(65),
-          payload: {
-            sessionKeyAddress: "0x1234567890abcdef1234567890abcdef12345678",
-            permissionScope: "nitrolite_state_update",
-            nonce: 1,
-            chainId: 1,
-          },
-        }),
-      ).rejects.toThrow("Signature does not match");
-    });
-
-    it("rejects when an active delegation already exists", async () => {
-      mockFindFirst.mockResolvedValueOnce({
-        id: "existing-key",
-        userAddress: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
-        revokedAt: null,
-        expiresAt: new Date(Date.now() + 86400000),
+    it('revokes existing before re-registering', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue({
+        id: 'old-key',
+        status: 'ACTIVE',
+      });
+      prisma.sessionKey.update.mockResolvedValue({});
+      prisma.sessionKey.create.mockResolvedValue({
+        id: 'new-key',
+        userAddress: validData.userAddress.toLowerCase(),
+        sessionKeyAddr: validData.sessionKeyAddress.toLowerCase(),
+        application: validData.application,
+        scope: validData.scope,
+        expiresAt: new Date(validData.expiresAt * 1000),
+        status: 'ACTIVE',
       });
 
-      await expect(
-        delegationService.submitDelegation({
-          userAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-          signature: "0x" + "ab".repeat(65),
-          payload: {
-            sessionKeyAddress: "0x1234567890abcdef1234567890abcdef12345678",
-            permissionScope: "nitrolite_state_update",
-            nonce: 1,
-            chainId: 1,
-          },
-        }),
-      ).rejects.toThrow("Active delegation already exists");
-    });
+      const result = await service.registerSessionKey(validData);
 
-    it("creates a session key on valid delegation", async () => {
-      mockFindFirst.mockResolvedValueOnce(null);
-      mockCreate.mockResolvedValue({
-        id: "new-key-id",
-        userAddress: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
-        publicKey: "0x1234567890abcdef1234567890abcdef12345678",
-        permissionScope: "nitrolite_state_update",
-        expiresAt: new Date(Date.now() + 86400000),
-      });
-
-      const result = await delegationService.submitDelegation({
-        userAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-        signature: "0x" + "ab".repeat(65),
-        payload: {
-          sessionKeyAddress: "0x1234567890abcdef1234567890abcdef12345678",
-          permissionScope: "nitrolite_state_update",
-          nonce: 1,
-          chainId: 1,
-        },
-      });
-
-      expect(result.sessionKeyId).toBe("new-key-id");
-      expect(mockCreate).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("revokeDelegation", () => {
-    it("revokes an active session key", async () => {
-      mockFindFirst.mockResolvedValue({
-        id: "key-to-revoke",
-        userAddress: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
-        revokedAt: null,
-      });
-      mockUpdate.mockResolvedValue({});
-
-      await delegationService.revokeDelegation({
-        userAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-        sessionKeyId: "key-to-revoke",
-      });
-
-      expect(mockUpdate).toHaveBeenCalledWith(
+      expect(prisma.sessionKey.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "key-to-revoke" },
-          data: expect.objectContaining({ revokedAt: expect.any(Date) }),
+          where: { id: 'old-key' },
+          data: expect.objectContaining({ status: 'REVOKED' }),
         }),
       );
+      expect(result.id).toBe('new-key');
     });
 
-    it("throws NotFound when session key does not exist", async () => {
-      mockFindFirst.mockResolvedValue(null);
+    it('rejects expired keys', async () => {
+      const expired = {
+        ...validData,
+        expiresAt: Math.floor(Date.now() / 1000) - 10,
+      };
 
-      await expect(
-        delegationService.revokeDelegation({
-          userAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-          sessionKeyId: "nonexistent",
-        }),
-      ).rejects.toThrow("Active session key not found");
+      await expect(service.registerSessionKey(expired)).rejects.toThrow(
+        'expired',
+      );
     });
   });
 
-  describe("validateSessionKey", () => {
-    it("returns valid for active key with matching scope", async () => {
-      mockFindFirst.mockResolvedValue({
-        id: "key-1",
-        userAddress: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
-        permissionScope: "nitrolite_state_update,lifi_intent_fulfillment",
-        revokedAt: null,
-        expiresAt: new Date(Date.now() + 86400000),
+  describe('revokeSessionKey', () => {
+    it('revokes an active key', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue({
+        id: 'key-1',
+        status: 'ACTIVE',
       });
+      prisma.sessionKey.update.mockResolvedValue({});
 
-      const result = await delegationService.validateSessionKey(
-        "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-        "nitrolite_state_update",
+      await service.revokeSessionKey(
+        validData.userAddress,
+        validData.sessionKeyAddress,
       );
 
-      expect(result.valid).toBe(true);
+      expect(prisma.sessionKey.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'REVOKED' }),
+        }),
+      );
     });
 
-    it("returns invalid for key missing required scope", async () => {
-      mockFindFirst.mockResolvedValue({
-        id: "key-1",
-        permissionScope: "nitrolite_state_update",
-        revokedAt: null,
-        expiresAt: new Date(Date.now() + 86400000),
-      });
+    it('throws if key not found', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue(null);
 
-      const result = await delegationService.validateSessionKey(
-        "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-        "lifi_intent_fulfillment",
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.reason).toContain("lacks scope");
+      await expect(
+        service.revokeSessionKey(validData.userAddress, validData.sessionKeyAddress),
+      ).rejects.toThrow('not found');
     });
 
-    it("returns invalid when no active session key exists", async () => {
-      mockFindFirst.mockResolvedValue(null);
+    it('throws if key already revoked', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue({
+        id: 'key-1',
+        status: 'REVOKED',
+      });
 
-      const result = await delegationService.validateSessionKey(
-        "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-        "nitrolite_state_update",
+      await expect(
+        service.revokeSessionKey(validData.userAddress, validData.sessionKeyAddress),
+      ).rejects.toThrow('already revoked');
+    });
+  });
+
+  describe('getActiveKeys', () => {
+    it('returns only active, non-expired keys', async () => {
+      prisma.sessionKey.findMany.mockResolvedValue([
+        {
+          id: 'k1',
+          sessionKeyAddr: '0x' + 'b'.repeat(40),
+          application: 'Flywheel',
+          scope: 'console',
+          allowances: [],
+          expiresAt: new Date(Date.now() + 3600000),
+          createdAt: new Date(),
+        },
+      ]);
+
+      const keys = await service.getActiveKeys(validData.userAddress);
+      expect(keys).toHaveLength(1);
+      expect(keys[0]!.id).toBe('k1');
+    });
+  });
+
+  describe('validateSessionKey', () => {
+    it('returns key if valid', async () => {
+      const futureDate = new Date(Date.now() + 3600000);
+      prisma.sessionKey.findUnique.mockResolvedValue({
+        id: 'k1',
+        status: 'ACTIVE',
+        expiresAt: futureDate,
+      });
+
+      const key = await service.validateSessionKey(
+        validData.userAddress,
+        validData.sessionKeyAddress,
       );
+      expect(key.id).toBe('k1');
+    });
 
-      expect(result.valid).toBe(false);
-      expect(result.reason).toContain("No active session key");
+    it('throws on revoked key', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue({
+        id: 'k1',
+        status: 'REVOKED',
+        expiresAt: new Date(Date.now() + 3600000),
+      });
+
+      await expect(
+        service.validateSessionKey(validData.userAddress, validData.sessionKeyAddress),
+      ).rejects.toThrow('revoked');
+    });
+
+    it('auto-expires and throws on expired key', async () => {
+      prisma.sessionKey.findUnique.mockResolvedValue({
+        id: 'k1',
+        status: 'ACTIVE',
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      prisma.sessionKey.update.mockResolvedValue({});
+
+      await expect(
+        service.validateSessionKey(validData.userAddress, validData.sessionKeyAddress),
+      ).rejects.toThrow('expired');
+
+      expect(prisma.sessionKey.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { status: 'EXPIRED' },
+        }),
+      );
     });
   });
 });

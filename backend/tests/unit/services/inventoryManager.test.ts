@@ -1,87 +1,84 @@
-/**
- * Unit tests for the Inventory Manager.
- *
- * Per stack_security.md: Never fulfill an intent if it would break
- * withdrawal guarantees ("Fast Exit Guarantee").
- */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryManager } from "../../../src/services/solver/inventoryManager.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { InventoryManager } from '../../../src/services/solver/inventoryManager.js';
 
-// Mock Prisma
-const mockFindFirst = vi.fn();
-const mockFindMany = vi.fn();
-const mockUpdate = vi.fn();
-const mockUpsert = vi.fn();
-
-vi.mock("../../../src/lib/prisma.js", () => ({
-  prisma: {
+function createMockPrisma() {
+  return {
     vaultInventory: {
-      findFirst: (...args: unknown[]) => mockFindFirst(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
-      upsert: (...args: unknown[]) => mockUpsert(...args),
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
     },
-    userBalance: {
-      findMany: (...args: unknown[]) => mockFindMany(...args),
+    withdrawalRequest: {
+      findMany: vi.fn(),
     },
-  },
-}));
+    $transaction: vi.fn(async (cb: any) => cb({
+      vaultInventory: {
+        findUnique: vi.fn().mockResolvedValue({ amount: '1000000' }),
+        upsert: vi.fn(),
+      },
+    })),
+    $executeRaw: vi.fn(),
+  } as any;
+}
 
-vi.mock("../../../src/lib/logger.js", () => ({
-  logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+describe('InventoryManager', () => {
+  let manager: InventoryManager;
+  let prisma: ReturnType<typeof createMockPrisma>;
 
-describe("InventoryManager.checkHealth", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    prisma = createMockPrisma();
+    manager = new InventoryManager(prisma);
   });
 
-  it("returns safe when vault has sufficient balance after fulfillment", async () => {
-    mockFindFirst.mockResolvedValue({ balance: "10000" });
-    mockFindMany.mockResolvedValue([{ balance: "5000" }]);
+  describe('getInventory', () => {
+    it('returns amount from DB', async () => {
+      prisma.vaultInventory.findUnique.mockResolvedValue({
+        amount: '5000000',
+      });
 
-    const result = await inventoryManager.checkHealth(8453, "USDC", "1000");
+      const result = await manager.getInventory(11155111, 'usdc');
+      expect(result.amount).toBe(5_000_000n);
+    });
 
-    expect(result.safe).toBe(true);
-    expect(result.reason).toBe("OK");
+    it('returns 0n when no record', async () => {
+      prisma.vaultInventory.findUnique.mockResolvedValue(null);
+
+      const result = await manager.getInventory(11155111, 'usdc');
+      expect(result.amount).toBe(0n);
+    });
   });
 
-  it("returns unsafe when vault has insufficient balance", async () => {
-    mockFindFirst.mockResolvedValue({ balance: "500" });
-    mockFindMany.mockResolvedValue([]);
+  describe('hasLiquidity', () => {
+    it('returns true when sufficient', async () => {
+      prisma.vaultInventory.findUnique.mockResolvedValue({
+        amount: '1000000',
+      });
+      prisma.withdrawalRequest.findMany.mockResolvedValue([]);
 
-    const result = await inventoryManager.checkHealth(8453, "USDC", "1000");
+      const result = await manager.hasLiquidity(11155111, 'usdc', 500_000n);
+      expect(result).toBe(true);
+    });
 
-    expect(result.safe).toBe(false);
-    expect(result.reason).toContain("Insufficient vault balance");
-  });
+    it('returns false when insufficient', async () => {
+      prisma.vaultInventory.findUnique.mockResolvedValue({
+        amount: '100',
+      });
+      prisma.withdrawalRequest.findMany.mockResolvedValue([]);
 
-  it("returns unsafe when fulfillment would break Fast Exit Guarantee", async () => {
-    // Vault has 2000, user claims are 8000, reserve = 8000 * 0.2 = 1600
-    // Fulfilling 1000 leaves 1000 < 1600
-    mockFindFirst.mockResolvedValue({ balance: "2000" });
-    mockFindMany.mockResolvedValue([
-      { balance: "3000" },
-      { balance: "5000" },
-    ]);
+      const result = await manager.hasLiquidity(11155111, 'usdc', 500_000n);
+      expect(result).toBe(false);
+    });
 
-    const result = await inventoryManager.checkHealth(8453, "USDC", "1000");
+    it('reserves pending withdrawals', async () => {
+      prisma.vaultInventory.findUnique.mockResolvedValue({
+        amount: '1000000',
+      });
+      prisma.withdrawalRequest.findMany.mockResolvedValue([
+        { amount: '900000' },
+      ]);
 
-    expect(result.safe).toBe(false);
-    expect(result.reason).toContain("Fast Exit Guarantee");
-  });
-
-  it("handles zero vault inventory gracefully", async () => {
-    mockFindFirst.mockResolvedValue(null);
-    mockFindMany.mockResolvedValue([]);
-
-    const result = await inventoryManager.checkHealth(8453, "USDC", "1000");
-
-    expect(result.safe).toBe(false);
-    expect(result.reason).toContain("Insufficient vault balance");
+      // Usable = 1000000 − 900000 = 100000, need 500000
+      const result = await manager.hasLiquidity(11155111, 'usdc', 500_000n);
+      expect(result).toBe(false);
+    });
   });
 });

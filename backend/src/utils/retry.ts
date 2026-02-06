@@ -1,51 +1,73 @@
-/**
- * Exponential backoff retry helper.
- */
-import { logger } from "../lib/logger.js";
-
 export interface RetryOptions {
-  readonly maxRetries: number;
-  readonly baseDelayMs: number;
-  readonly maxDelayMs: number;
-  readonly label?: string;
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  /** Return false to skip retrying on a specific error. */
+  isRetryable?: (error: unknown) => boolean;
 }
 
-const DEFAULT_OPTIONS: RetryOptions = {
-  maxRetries: 5,
-  baseDelayMs: 200,
-  maxDelayMs: 10_000,
-};
-
-export async function withRetry<T>(
+/**
+ * Execute `fn` with exponential back-off.
+ * Rejects with the last error once retries are exhausted.
+ */
+export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  opts: Partial<RetryOptions> = {},
+  options: RetryOptions = {},
 ): Promise<T> {
-  const { maxRetries, baseDelayMs, maxDelayMs, label } = {
-    ...DEFAULT_OPTIONS,
-    ...opts,
-  };
+  const {
+    maxRetries = 3,
+    initialDelayMs = 1000,
+    maxDelayMs = 30_000,
+    isRetryable = () => true,
+  } = options;
 
-  let lastError: Error | undefined;
+  let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
+    } catch (error) {
+      lastError = error;
 
-      if (attempt === maxRetries) break;
+      if (attempt === maxRetries || !isRetryable(error)) {
+        throw error;
+      }
 
-      const delay = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
-      const jitter = delay * (0.5 + Math.random() * 0.5);
-
-      logger.warn(
-        { attempt: attempt + 1, maxRetries, delay: Math.round(jitter), label },
-        "Retrying after error",
+      const delay = Math.min(
+        initialDelayMs * Math.pow(2, attempt),
+        maxDelayMs,
       );
-
-      await new Promise((resolve) => setTimeout(resolve, jitter));
+      await sleep(delay);
     }
   }
 
+  // Should be unreachable, but satisfies TS.
   throw lastError;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Wrap a promise with a timeout. Rejects if it takes longer than `ms`.
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message = 'Operation timed out',
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }

@@ -1,85 +1,126 @@
-/**
- * Unit tests for validation utilities.
- */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from 'vitest';
 import {
-  validateAddress,
-  validateChainId,
-  validatePositiveAmount,
-  validateHexString,
-} from "../../../src/utils/validation.js";
+  ethereumAddress,
+  uint256String,
+  chainId,
+  hexString,
+  allowanceSchema,
+  delegationRequestSchema,
+  withdrawalRequestSchema,
+} from '../../../src/utils/validation.js';
 
-describe("validateAddress", () => {
-  it("accepts a valid checksummed address", () => {
-    const addr = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    expect(validateAddress(addr)).toBe(addr);
+describe('ethereumAddress', () => {
+  it('accepts valid checksummed address', () => {
+    expect(
+      ethereumAddress.safeParse('0x' + 'aB'.repeat(20)).success,
+    ).toBe(true);
   });
 
-  it("accepts a valid lowercase address", () => {
-    const addr = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
-    expect(validateAddress(addr)).toBe(addr);
+  it('accepts lowercase address', () => {
+    expect(
+      ethereumAddress.safeParse('0x' + 'a'.repeat(40)).success,
+    ).toBe(true);
   });
 
-  it("rejects an invalid address", () => {
-    expect(() => validateAddress("0xinvalid")).toThrow("Invalid Ethereum address");
+  it('rejects too-short address', () => {
+    expect(ethereumAddress.safeParse('0x123').success).toBe(false);
   });
 
-  it("rejects an empty string", () => {
-    expect(() => validateAddress("")).toThrow("Invalid Ethereum address");
-  });
-
-  it("includes the field name in error message", () => {
-    expect(() => validateAddress("bad", "sender")).toThrow("sender");
-  });
-});
-
-describe("validateChainId", () => {
-  it("accepts a valid chain ID", () => {
-    expect(validateChainId(1)).toBe(1);
-    expect(validateChainId(8453)).toBe(8453);
-  });
-
-  it("rejects zero", () => {
-    expect(() => validateChainId(0)).toThrow("Invalid chain ID");
-  });
-
-  it("rejects negative numbers", () => {
-    expect(() => validateChainId(-1)).toThrow("Invalid chain ID");
-  });
-
-  it("rejects non-integers", () => {
-    expect(() => validateChainId(1.5)).toThrow("Invalid chain ID");
+  it('rejects missing 0x prefix', () => {
+    expect(
+      ethereumAddress.safeParse('a'.repeat(40)).success,
+    ).toBe(false);
   });
 });
 
-describe("validatePositiveAmount", () => {
-  it("accepts a valid positive amount", () => {
-    expect(validatePositiveAmount("1000000000000000000")).toBe(1000000000000000000n);
+describe('uint256String', () => {
+  it('accepts "0"', () => {
+    expect(uint256String.safeParse('0').success).toBe(true);
   });
 
-  it("rejects zero", () => {
-    expect(() => validatePositiveAmount("0")).toThrow("Invalid positive amount");
+  it('accepts large number', () => {
+    expect(uint256String.safeParse('999999999999999999').success).toBe(true);
   });
 
-  it("rejects negative amounts", () => {
-    expect(() => validatePositiveAmount("-1")).toThrow("Invalid positive amount");
+  it('rejects negative', () => {
+    expect(uint256String.safeParse('-1').success).toBe(false);
   });
 
-  it("rejects non-numeric strings", () => {
-    expect(() => validatePositiveAmount("abc")).toThrow("Invalid positive amount");
+  it('rejects non-numeric', () => {
+    expect(uint256String.safeParse('abc').success).toBe(false);
   });
 });
 
-describe("validateHexString", () => {
-  it("accepts a valid hex string", () => {
-    expect(validateHexString("0xabcdef")).toBe("0xabcdef");
+describe('chainId', () => {
+  it('accepts positive int', () => {
+    expect(chainId.safeParse(11155111).success).toBe(true);
   });
 
-  it("rejects strings without 0x prefix", () => {
-    expect(() => validateHexString("abcdef")).toThrow("Invalid hex string");
+  it('rejects zero', () => {
+    expect(chainId.safeParse(0).success).toBe(false);
   });
 
-  it("rejects strings with invalid characters", () => {
-    expect(() => validateHexString("0xghi")).toThrow("Invalid hex string");
+  it('rejects float', () => {
+    expect(chainId.safeParse(1.5).success).toBe(false);
+  });
+});
+
+describe('hexString', () => {
+  it('accepts 0x-prefixed hex', () => {
+    expect(hexString.safeParse('0xdeadbeef').success).toBe(true);
+    expect(hexString.safeParse('0x').success).toBe(true);
+  });
+
+  it('rejects non-hex', () => {
+    expect(hexString.safeParse('deadbeef').success).toBe(false);
+    expect(hexString.safeParse('0xGG').success).toBe(false);
+  });
+});
+
+describe('allowanceSchema', () => {
+  it('accepts valid allowance', () => {
+    expect(
+      allowanceSchema.safeParse({ asset: 'usdc', amount: '1000000' }).success,
+    ).toBe(true);
+  });
+
+  it('rejects missing asset', () => {
+    expect(
+      allowanceSchema.safeParse({ amount: '100' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('delegationRequestSchema', () => {
+  const valid = {
+    userAddress: '0x' + 'a'.repeat(40),
+    sessionKeyAddress: '0x' + 'b'.repeat(40),
+    application: 'Flywheel',
+    scope: 'console',
+    allowances: [{ asset: 'usdc', amount: '1000000' }],
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    signature: '0x' + 'ab'.repeat(32),
+  };
+
+  it('accepts valid delegation', () => {
+    expect(delegationRequestSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects missing signature', () => {
+    const { signature, ...rest } = valid;
+    expect(delegationRequestSchema.safeParse(rest).success).toBe(false);
+  });
+});
+
+describe('withdrawalRequestSchema', () => {
+  it('accepts valid withdrawal', () => {
+    expect(
+      withdrawalRequestSchema.safeParse({
+        userAddress: '0x' + 'a'.repeat(40),
+        asset: 'eth',
+        amount: '1000000000000000000',
+        chainId: 11155111,
+      }).success,
+    ).toBe(true);
   });
 });
