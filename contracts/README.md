@@ -51,6 +51,22 @@ $ anvil
 $ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
 ```
 
+### Deploy SessionKeyRegistry (with `.env`)
+
+Create a `.env` file in `contracts/`:
+
+```shell
+PRIVATE_KEY=0xYOUR_PRIVATE_KEY
+RPC_URL=https://your-rpc-url
+```
+
+Then run:
+
+```shell
+$ source .env
+$ forge script script/SessionKeyRegistry.s.sol:SessionKeyRegistryScript --rpc-url $RPC_URL --broadcast
+```
+
 ### Cast
 
 ```shell

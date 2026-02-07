@@ -8,6 +8,7 @@ import {MessageHashUtils} from "openzeppelin-contracts/contracts/utils/cryptogra
 import {IOriginSettler} from "./interfaces/IOriginSettler.sol";
 import {GaslessCrossChainOrder, OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction} from "./erc7683/Structs.sol";
 import {LifiAdapter} from "./LifiAdapter.sol";
+import {SessionKeyRegistry} from "./onboard/SessionKeyRegistry.sol";
 
 contract UXOriginSettler is AccessControl, IOriginSettler {
     bytes32 public constant SETTLER_ADMIN_ROLE = keccak256("SETTLER_ADMIN_ROLE");
@@ -28,6 +29,7 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
     mapping(address => mapping(uint256 => bool)) public nonceUsed;
 
     LifiAdapter public lifiAdapter;
+    SessionKeyRegistry public sessionKeyRegistry;
 
     error InvalidSignature();
     error InvalidOrderDataType();
@@ -35,6 +37,8 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
     error InvalidArrays();
     error NonceAlreadyUsed();
     error OrderExpired();
+    error InactiveSessionKey();
+    error SpendCapExceeded();
 
     constructor(address admin, address lifiAdapter_) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -44,6 +48,10 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
 
     function setLifiAdapter(address lifiAdapter_) external onlyRole(SETTLER_ADMIN_ROLE) {
         lifiAdapter = LifiAdapter(lifiAdapter_);
+    }
+
+    function setSessionKeyRegistry(address sessionKeyRegistry_) external onlyRole(SETTLER_ADMIN_ROLE) {
+        sessionKeyRegistry = SessionKeyRegistry(sessionKeyRegistry_);
     }
 
     function open(OnchainCrossChainOrder calldata order) external returns (bytes32 orderId) {
@@ -92,13 +100,19 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
             revert OrderExpired();
         }
 
-        _verifySignature(order, signature);
-
         UXDepositOrder memory uxOrder = _decode(order.orderData);
         if (uxOrder.user != order.user) {
             revert InvalidOrderOrigin();
         }
         _validateArrays(uxOrder.outputs, uxOrder.destinationCallData);
+
+        address signer = _recoverSigner(order, signature);
+        if (signer != order.user) {
+            if (address(sessionKeyRegistry) == address(0)) {
+                revert InvalidSignature();
+            }
+            _enforceSessionKeySpend(order.user, signer, uxOrder.inputToken, uxOrder.inputAmount);
+        }
 
         _useNonce(order.user, order.nonce);
         orderId = _computeOrderId(order.user, order.originChainId, order.orderDataType, order.orderData, order.nonce);
@@ -225,7 +239,7 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
         return keccak256(abi.encode(address(this), user, originChainId, nonce, orderDataType, keccak256(orderData)));
     }
 
-    function _verifySignature(GaslessCrossChainOrder calldata order, bytes calldata signature) internal pure {
+    function _recoverSigner(GaslessCrossChainOrder calldata order, bytes calldata signature) internal pure returns (address) {
         bytes32 orderHash = keccak256(
             abi.encode(
                 order.originSettler,
@@ -241,9 +255,18 @@ contract UXOriginSettler is AccessControl, IOriginSettler {
 
         // NOTE: This uses an eth-sign digest for now; move to EIP-712/Permit2 once finalized.
         bytes32 digest = MessageHashUtils.toEthSignedMessageHash(orderHash);
-        address signer = ECDSA.recover(digest, signature);
-        if (signer != order.user) {
-            revert InvalidSignature();
+        return ECDSA.recover(digest, signature);
+    }
+
+    function _enforceSessionKeySpend(address user, address signer, address token, uint256 amount) internal view {
+        SessionKeyRegistry registry = sessionKeyRegistry;
+        if (!registry.isSessionKeyActive(user, signer)) {
+            revert InactiveSessionKey();
+        }
+
+        uint256 cap = registry.getCap(user, signer, token);
+        if (cap == 0 || amount > cap) {
+            revert SpendCapExceeded();
         }
     }
 
