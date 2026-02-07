@@ -92,3 +92,89 @@ jest.mock('@erc7824/nitrolite', () => ({
     ],
   },
 }));
+
+jest.mock('react-native-get-random-values', () => {});
+
+jest.mock('@walletconnect/react-native-compat', () => {});
+
+const mockUseAppKit = jest.fn().mockReturnValue({
+  open: jest.fn(),
+  close: jest.fn(),
+  disconnect: jest.fn(),
+  switchNetwork: jest.fn(),
+});
+
+const mockUseAccount = jest.fn().mockReturnValue({
+  address: undefined,
+  isConnected: false,
+  chainId: undefined,
+});
+
+jest.mock('@reown/appkit-react-native', () => {
+  const React = require('react');
+  return {
+    createAppKit: jest.fn().mockReturnValue({}),
+    AppKit: () => null,
+    AppKitProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAppKit: mockUseAppKit,
+    useAccount: mockUseAccount,
+    useProvider: jest.fn().mockReturnValue({ provider: null }),
+    useWalletInfo: jest.fn().mockReturnValue({ walletInfo: null }),
+    useAppKitState: jest.fn().mockReturnValue({}),
+    useAppKitEvents: jest.fn(),
+  };
+});
+
+jest.mock('@reown/appkit-wagmi-react-native', () => ({
+  WagmiAdapter: jest.fn().mockImplementation(() => ({
+    wagmiConfig: {},
+    wagmiChains: [],
+  })),
+}));
+
+jest.mock('wagmi', () => {
+  const React = require('react');
+  return {
+    WagmiProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAccount: jest.fn().mockReturnValue({
+      address: undefined,
+      isConnected: false,
+    }),
+    useSignTypedData: jest.fn().mockReturnValue({
+      signTypedData: jest.fn(),
+      signTypedDataAsync: jest.fn(),
+    }),
+  };
+});
+
+jest.mock('wagmi/chains', () => ({
+  sepolia: { id: 11155111, name: 'Sepolia' },
+  baseSepolia: { id: 84532, name: 'Base Sepolia' },
+  mainnet: { id: 1, name: 'Ethereum' },
+  arbitrum: { id: 42161, name: 'Arbitrum One' },
+}));
+
+jest.mock('@react-native-community/netinfo', () => ({
+  addEventListener: jest.fn().mockReturnValue(jest.fn()),
+  fetch: jest.fn().mockResolvedValue({
+    isConnected: true,
+    isInternetReachable: true,
+    type: 'wifi',
+  }),
+}));
+
+jest.mock('expo-application', () => ({
+  applicationId: 'com.flywheel.wallet',
+  applicationName: 'Flywheel',
+  nativeApplicationVersion: '0.1.0',
+  nativeBuildVersion: '1',
+}));
+
+jest.mock('@/config/wagmi', () => ({
+  wagmiAdapter: { wagmiConfig: {} },
+  appkit: {},
+  networks: [
+    { id: 11155111, name: 'Sepolia' },
+    { id: 84532, name: 'Base Sepolia' },
+  ],
+}));
