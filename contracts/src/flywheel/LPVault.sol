@@ -19,6 +19,7 @@ contract LPVault is AccessControl, ReentrancyGuard {
 
     event Deposited(address indexed user, address indexed asset, uint256 amount, address indexed receiver);
     event Withdrawn(address indexed user, address indexed asset, uint256 amount, address indexed recipient);
+    event RouterDeposit(address indexed router, address indexed user, address indexed asset, uint256 amount, address receiver);
     event RouterWithdrawal(address indexed router, address indexed user, address indexed asset, uint256 amount, address recipient);
     event RouterRoleUpdated(address indexed router, bool enabled);
 
@@ -70,6 +71,22 @@ contract LPVault is AccessControl, ReentrancyGuard {
         IERC20(asset).safeTransfer(recipient, amount);
 
         emit RouterWithdrawal(msg.sender, user, asset, amount, recipient);
+    }
+
+    function depositFor(
+        address user,
+        address asset,
+        uint256 amount,
+        address receiver
+    ) external nonReentrant onlyRole(ROUTER_ROLE) {
+        if (asset == address(0) || user == address(0) || receiver == address(0)) revert InvalidAddress();
+        if (amount == 0) revert InvalidAmount();
+
+        IERC20(asset).safeTransferFrom(user, address(this), amount);
+        principalOf[receiver][asset] += amount;
+        totalPrincipalByAsset[asset] += amount;
+
+        emit RouterDeposit(msg.sender, user, asset, amount, receiver);
     }
 
     function _debitPrincipal(address user, address asset, uint256 amount) internal {

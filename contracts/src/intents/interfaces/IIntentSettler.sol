@@ -3,7 +3,7 @@ pragma solidity ^0.8.33;
 
 import {GaslessCrossChainOrder, OnchainCrossChainOrder, ResolvedCrossChainOrder} from "../erc7683/Structs.sol";
 
-interface IOriginSettler {
+interface IIntentSettler {
     event Open(bytes32 indexed orderId, ResolvedCrossChainOrder resolvedOrder);
 
     function open(OnchainCrossChainOrder calldata order) external returns (bytes32 orderId);

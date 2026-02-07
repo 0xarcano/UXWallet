@@ -4,13 +4,13 @@ pragma solidity ^0.8.33;
 import {Test} from "forge-std/Test.sol";
 
 import {SessionKeyRegistry} from "../src/onboard/SessionKeyRegistry.sol";
-import {UXOriginSettler} from "../src/FlywheelSettler.sol";
+import {IntentSettler} from "../src/intents/IntentSettler.sol";
 import {LPVault} from "../src/flywheel/LPVault.sol";
 import {TreasuryVault} from "../src/flywheel/TreasuryVault.sol";
-import {WithdrawalRouter} from "../src/flywheel/WithdrawalRouter.sol";
 import {NitroSettlementAdapter} from "../src/flywheel/NitroSettlementAdapter.sol";
+import {FlywheelProtocol} from "../src/flywheel/FlywheelProtocol.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {GaslessCrossChainOrder, Output} from "../src/erc7683/Structs.sol";
+import {GaslessCrossChainOrder, Output} from "../src/intents/erc7683/Structs.sol";
 
 contract MockAdjudicator {
     bytes32 public lastChannelId;
@@ -45,7 +45,6 @@ contract FlywheelWorkflowTest is Test {
     address private immutable user = vm.addr(USER_PK);
     address private immutable sessionKey = vm.addr(SESSION_KEY_PK);
     address private solver = vm.addr(0x5150);
-    address private rewardFunder = vm.addr(0x7777);
     address private treasuryOperator = vm.addr(0x8888);
     address private treasuryRecipient = vm.addr(0x9999);
 
@@ -56,11 +55,11 @@ contract FlywheelWorkflowTest is Test {
     uint256 private constant TREASURY_REWARD = 5 ether;
 
     SessionKeyRegistry private registry;
-    UXOriginSettler private settler;
+    IntentSettler private settler;
     LPVault private lpVault;
     TreasuryVault private treasuryVault;
-    WithdrawalRouter private withdrawalRouter;
     NitroSettlementAdapter private nitroAdapter;
+    FlywheelProtocol private protocol;
 
     MockERC20 private token;
     MockAdjudicator private adjudicator;
@@ -69,23 +68,34 @@ contract FlywheelWorkflowTest is Test {
     function setUp() public {
         token = new MockERC20("Mock Liquidity", "mLQ");
         registry = new SessionKeyRegistry();
-        settler = new UXOriginSettler(address(this), address(0));
+        settler = new IntentSettler(address(this), address(0));
         settler.setSessionKeyRegistry(address(registry));
 
         lpVault = new LPVault(address(this));
         treasuryVault = new TreasuryVault(address(this));
-        withdrawalRouter = new WithdrawalRouter(address(this), address(lpVault));
 
         adjudicator = new MockAdjudicator();
         custody = new MockCustody();
         nitroAdapter = new NitroSettlementAdapter(address(this), address(adjudicator), address(custody));
 
-        lpVault.setRouter(address(withdrawalRouter), true);
-        treasuryVault.setRewardDistributor(treasuryOperator, true);
-        nitroAdapter.grantRole(nitroAdapter.SETTLER_ROLE(), solver);
+        protocol = new FlywheelProtocol(
+            address(this),
+            address(registry),
+            address(settler),
+            address(lpVault),
+            address(treasuryVault),
+            address(nitroAdapter)
+        );
+
+        lpVault.setRouter(address(protocol), true);
+        treasuryVault.setRewardDistributor(address(protocol), true);
+        treasuryVault.grantRole(treasuryVault.TREASURY_ADMIN_ROLE(), address(protocol));
+        nitroAdapter.grantRole(nitroAdapter.SETTLER_ROLE(), address(protocol));
+
+        protocol.setSolver(solver, true);
+        protocol.setTreasuryOperator(treasuryOperator, true);
 
         token.mint(user, 1_000 ether);
-        token.mint(rewardFunder, 100 ether);
         token.mint(treasuryOperator, 100 ether);
     }
 
@@ -97,20 +107,24 @@ contract FlywheelWorkflowTest is Test {
     }
 
     function _step1DepositAndDelegate() internal {
+        SessionKeyRegistry.RegisterSessionKeyRequest memory request = _sessionRequest(user, sessionKey);
+        (address[] memory tokens, uint256[] memory caps) = _singleCap(address(token), 50 ether);
+        bytes32 digest = registry.registerSessionKeyDigest(request, tokens, caps);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(USER_PK, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
         vm.startPrank(user);
         token.approve(address(lpVault), PRINCIPAL_AMOUNT);
-        lpVault.deposit(address(token), PRINCIPAL_AMOUNT, user);
+        protocol.delegateAndRegister(address(token), PRINCIPAL_AMOUNT, user, request, tokens, caps, signature);
         vm.stopPrank();
 
         assertEq(lpVault.principalOf(user, address(token)), PRINCIPAL_AMOUNT);
-
-        _registerSessionKeyWithSig(user, sessionKey, address(token), 50 ether);
         assertTrue(registry.isSessionKeyActive(user, sessionKey));
         assertEq(registry.getCap(user, sessionKey, address(token)), 50 ether);
     }
 
     function _step2FulfillIntentAndRegisterAccounting() internal returns (bytes32 intentId) {
-        UXOriginSettler.UXDepositOrder memory uxOrder = _buildUxOrder(user, INTENT_AMOUNT);
+        IntentSettler.UXDepositOrder memory uxOrder = _buildUxOrder(user, INTENT_AMOUNT);
         GaslessCrossChainOrder memory order = GaslessCrossChainOrder({
             originSettler: address(settler),
             user: user,
@@ -124,7 +138,7 @@ contract FlywheelWorkflowTest is Test {
 
         bytes memory sessionSig = _signOrder(order, SESSION_KEY_PK);
         vm.prank(solver);
-        intentId = settler.openFor(order, sessionSig, "");
+        intentId = protocol.fulfillIntent(order, sessionSig, "");
 
         assertTrue(settler.nonceUsed(user, uxOrder.nonce));
 
@@ -132,10 +146,10 @@ contract FlywheelWorkflowTest is Test {
     }
 
     function _step2SettleTreasuryAndNitro(bytes32) internal {
-        vm.startPrank(treasuryOperator);
-        token.approve(address(treasuryVault), TREASURY_REWARD);
-        treasuryVault.creditTreasury(address(token), TREASURY_REWARD);
-        vm.stopPrank();
+        vm.prank(treasuryOperator);
+        token.approve(address(protocol), TREASURY_REWARD);
+        vm.prank(treasuryOperator);
+        protocol.creditTreasury(address(token), TREASURY_REWARD);
 
         assertEq(treasuryVault.treasuryBalance(address(token)), TREASURY_REWARD);
 
@@ -145,9 +159,9 @@ contract FlywheelWorkflowTest is Test {
         bytes memory releaseCall = abi.encodeCall(MockCustody.release, (user, INTENT_AMOUNT));
 
         vm.prank(solver);
-        nitroAdapter.callAdjudicator(concludeCall);
+        protocol.settleViaAdjudicator(concludeCall);
         vm.prank(solver);
-        nitroAdapter.callCustody(releaseCall);
+        protocol.settleViaCustody(releaseCall);
 
         assertEq(adjudicator.concludeCount(), 1);
         assertEq(adjudicator.lastChannelId(), channelId);
@@ -160,48 +174,39 @@ contract FlywheelWorkflowTest is Test {
     function _step3WithdrawAndDistribute() internal {
         uint256 userBalanceBefore = token.balanceOf(user);
         vm.prank(user);
-        withdrawalRouter.withdrawPrincipal(address(token), PRINCIPAL_AMOUNT, user);
+        protocol.withdrawPrincipal(address(token), PRINCIPAL_AMOUNT, user);
 
         assertEq(lpVault.principalOf(user, address(token)), 0);
         assertEq(token.balanceOf(user), userBalanceBefore + PRINCIPAL_AMOUNT);
 
         uint256 treasuryRecipientBefore = token.balanceOf(treasuryRecipient);
-        treasuryVault.withdrawTreasury(address(token), TREASURY_REWARD, treasuryRecipient);
+        vm.prank(treasuryOperator);
+        protocol.withdrawTreasury(address(token), TREASURY_REWARD, treasuryRecipient);
         assertEq(token.balanceOf(treasuryRecipient), treasuryRecipientBefore + TREASURY_REWARD);
 
-        vm.expectRevert();
+        vm.expectRevert(); // Protocol is the only router configured on LPVault.
         lpVault.withdrawFor(user, address(token), 1 ether, treasuryRecipient);
     }
 
-    function _registerSessionKeyWithSig(
-        address owner,
-        address key,
-        address spendToken,
-        uint256 cap
-    ) internal {
-        address[] memory tokens = new address[](1);
+    function _singleCap(address spendToken, uint256 cap) internal pure returns (address[] memory tokens, uint256[] memory caps) {
+        tokens = new address[](1);
         tokens[0] = spendToken;
 
-        uint256[] memory caps = new uint256[](1);
+        caps = new uint256[](1);
         caps[0] = cap;
+    }
 
-        SessionKeyRegistry.RegisterSessionKeyRequest memory request = SessionKeyRegistry.RegisterSessionKeyRequest({
+    function _sessionRequest(address owner, address key) internal view returns (SessionKeyRegistry.RegisterSessionKeyRequest memory request) {
+        request = SessionKeyRegistry.RegisterSessionKeyRequest({
             user: owner,
             sessionKey: key,
             expiresAt: uint64(block.timestamp + 7 days),
             nonce: registry.nonces(owner),
             deadline: block.timestamp + 1 days
         });
-
-        bytes32 digest = registry.registerSessionKeyDigest(request, tokens, caps);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(USER_PK, digest);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        vm.prank(solver);
-        registry.registerSessionKeyWithSig(request, tokens, caps, signature);
     }
 
-    function _buildUxOrder(address user_, uint256 amount) internal view returns (UXOriginSettler.UXDepositOrder memory uxOrder) {
+    function _buildUxOrder(address user_, uint256 amount) internal view returns (IntentSettler.UXDepositOrder memory uxOrder) {
         Output[] memory outputs = new Output[](1);
         outputs[0] = Output({
             token: _toBytes32(address(token)),
@@ -213,7 +218,7 @@ contract FlywheelWorkflowTest is Test {
         bytes[] memory destinationCallData = new bytes[](1);
         destinationCallData[0] = "";
 
-        uxOrder = UXOriginSettler.UXDepositOrder({
+        uxOrder = IntentSettler.UXDepositOrder({
             user: user_,
             inputToken: address(token),
             inputAmount: amount,

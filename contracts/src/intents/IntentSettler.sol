@@ -5,12 +5,12 @@ import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessContr
 import {ECDSA} from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {IOriginSettler} from "./interfaces/IOriginSettler.sol";
+import {IIntentSettler} from "./interfaces/IIntentSettler.sol";
 import {GaslessCrossChainOrder, OnchainCrossChainOrder, ResolvedCrossChainOrder, Output, FillInstruction} from "./erc7683/Structs.sol";
 import {LifiAdapter} from "./LifiAdapter.sol";
-import {SessionKeyRegistry} from "./onboard/SessionKeyRegistry.sol";
+import {SessionKeyRegistry} from "../onboard/SessionKeyRegistry.sol";
 
-contract UXOriginSettler is AccessControl, IOriginSettler {
+contract IntentSettler is AccessControl, IIntentSettler {
     bytes32 public constant SETTLER_ADMIN_ROLE = keccak256("SETTLER_ADMIN_ROLE");
     // NOTE: Replace with the full EIP-712 typehash once the UXDepositOrder schema is finalized.
     bytes32 public constant ORDER_DATA_TYPE = keccak256("UXDepositOrder");
