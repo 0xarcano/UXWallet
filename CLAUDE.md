@@ -19,7 +19,7 @@ Four independent sub-projects sharing a git repo:
 | `contracts/` | Solidity 0.8.33, Foundry | Custody & settlement smart contracts |
 | `lif-rust/` | Rust, Axum, Alloy, Tokio | LiFi integration microservice |
 
-Each sub-project has its own build system, dependencies, and `.context/` folder with architecture, standards, security, and testing docs. Always review `../.context/` (project-wide) and `.context/` (sub-project) before writing code.
+Each sub-project has its own build system and dependencies. `backend/`, `frontend/`, and `contracts/` each have a `.context/` folder with architecture, standards, security, and testing docs. `lif-rust/` does not have a `.context/` folder — see its `README.md` and the root-level `.context/lif-rust-integration.md` instead. Always review `../.context/` (project-wide) and `.context/` (sub-project) before writing code.
 
 ## Build & Development Commands
 
@@ -37,6 +37,10 @@ npm run db:push                # Push schema directly to DB
 
 # Development
 npm run dev                    # tsx watch mode on port 3001
+
+# Build & Production
+npm run build                  # tsc
+npm start                      # node dist/index.js
 
 # Quality
 npm run test                   # Vitest unit tests
@@ -65,7 +69,7 @@ cargo test                     # Tests
 Env vars: `LIFI_API_URL` (default: `https://li.quest/v1`), `LIFI_API_KEY`, `UX_ORIGIN_SETTLER`, `PORT` (default: 8080).
 
 ### Frontend (`frontend/`)
-See `frontend/README.md` for commands.
+See `frontend/CLAUDE.md` and `frontend/.context/` for commands and architecture.
 
 ## Architecture
 
@@ -91,7 +95,11 @@ See `frontend/README.md` for commands.
 - `src/kms/` — signing (local dev / AWS)
 
 ### API Routes (Backend)
-`/health`, `/api/delegation`, `/api/balance`, `/api/withdrawal`, `/api/state`
+- `/health` — GET
+- `/api/delegation` — POST /submit, POST /revoke, GET /status/:address
+- `/api/balance` — GET /:address, GET /:address/:asset
+- `/api/withdrawal` — POST /request, GET /status/:id, GET /history/:address
+- `/api/state` — GET /proof/:address, GET /sessions/:address
 
 ### lif-rust Endpoints
 `GET /health`, `POST /lifi/quote`, `POST /intent/build`, `POST /intent/calldata`
@@ -101,7 +109,7 @@ See `frontend/README.md` for commands.
 - **LifiAdapter**: Wrapper for LiFi integration
 
 ### Database (Prisma/PostgreSQL)
-Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInventory`, `IntentLog`, `YieldLog`, `WithdrawalRequest`. Schema at `backend/prisma/schema.prisma`.
+Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInventory`, `IntentLog`, `YieldLog`, `WithdrawalRequest`. Key enums: `SessionStatus`, `TransactionType`, `IntentStatus`, `WithdrawalStatus`, `ExitType`. Schema at `backend/prisma/schema.prisma`.
 
 ## Development Phases
 
@@ -110,7 +118,7 @@ Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInvento
 
 ## Context Documentation
 
-Each sub-project has a `.context/` folder structured as:
+`backend/`, `frontend/`, and `contracts/` each have a `.context/` folder structured as:
 - `00_meta/` — role definitions
 - `01_product/` — product specs, user stories, domain glossary
 - `02_architecture/` — system design, project structure, database schema
@@ -119,4 +127,4 @@ Each sub-project has a `.context/` folder structured as:
 - `05_security/` — security guidelines
 - `06_testing/` — testing strategy and tools
 
-Root-level `.context/` has project-wide docs: `project-context.md`, `sequence-diagrams.md` (canonical), `diagrams.md`, `best-practices.md`.
+Root-level `.context/` has project-wide docs: `project-context.md`, `sequence-diagrams.md` (canonical), `diagrams.md`, `best-practices.md`, `lif-rust-integration.md`.
