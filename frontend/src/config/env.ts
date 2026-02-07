@@ -11,6 +11,13 @@ const envSchema = z.object({
 
 type Env = z.infer<typeof envSchema>;
 
+const DEV_DEFAULTS: Env = {
+  EXPO_PUBLIC_API_URL: 'http://localhost:3000/api',
+  EXPO_PUBLIC_WS_URL: 'ws://localhost:3000/ws',
+  EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID: 'placeholder',
+  EXPO_PUBLIC_CHAIN_ENV: 'testnet',
+};
+
 function getEnv(): Env {
   const result = envSchema.safeParse({
     EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
@@ -20,6 +27,13 @@ function getEnv(): Env {
   });
 
   if (!result.success) {
+    if (__DEV__) {
+      const formatted = result.error.issues
+        .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+        .join('\n');
+      console.warn(`Missing environment variables (using dev defaults):\n${formatted}`);
+      return DEV_DEFAULTS;
+    }
     const formatted = result.error.issues
       .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
       .join('\n');
