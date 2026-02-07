@@ -7,7 +7,6 @@ import {SessionKeyRegistry} from "../src/onboard/SessionKeyRegistry.sol";
 import {UXOriginSettler} from "../src/FlywheelSettler.sol";
 import {LPVault} from "../src/flywheel/LPVault.sol";
 import {TreasuryVault} from "../src/flywheel/TreasuryVault.sol";
-import {CreditLedger} from "../src/flywheel/CreditLedger.sol";
 import {WithdrawalRouter} from "../src/flywheel/WithdrawalRouter.sol";
 import {NitroSettlementAdapter} from "../src/flywheel/NitroSettlementAdapter.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
@@ -60,7 +59,6 @@ contract FlywheelWorkflowTest is Test {
     UXOriginSettler private settler;
     LPVault private lpVault;
     TreasuryVault private treasuryVault;
-    CreditLedger private ledger;
     WithdrawalRouter private withdrawalRouter;
     NitroSettlementAdapter private nitroAdapter;
 
@@ -76,19 +74,14 @@ contract FlywheelWorkflowTest is Test {
 
         lpVault = new LPVault(address(this));
         treasuryVault = new TreasuryVault(address(this));
-        ledger = new CreditLedger(address(this));
-        withdrawalRouter = new WithdrawalRouter(address(this), address(lpVault), address(ledger));
+        withdrawalRouter = new WithdrawalRouter(address(this), address(lpVault));
 
         adjudicator = new MockAdjudicator();
         custody = new MockCustody();
         nitroAdapter = new NitroSettlementAdapter(address(this), address(adjudicator), address(custody));
 
         lpVault.setRouter(address(withdrawalRouter), true);
-        ledger.setRouter(address(withdrawalRouter), true);
-        ledger.setTreasuryRole(treasuryOperator, true);
-        withdrawalRouter.setRewardFunder(rewardFunder, true);
         treasuryVault.setRewardDistributor(treasuryOperator, true);
-        ledger.grantRole(ledger.ENGINE_ROLE(), solver);
         nitroAdapter.grantRole(nitroAdapter.SETTLER_ROLE(), solver);
 
         token.mint(user, 1_000 ether);
@@ -135,22 +128,16 @@ contract FlywheelWorkflowTest is Test {
 
         assertTrue(settler.nonceUsed(user, uxOrder.nonce));
 
-        vm.prank(solver);
-        ledger.registerIntentAccounting(intentId, user, address(token), INTENT_AMOUNT, REWARD_AMOUNT);
-
-        assertEq(ledger.userRewards(user, address(token)), USER_REWARD);
-        assertEq(ledger.treasuryRewards(address(token)), TREASURY_REWARD);
+        // Rewards are tracked off-chain in the database, not on-chain
     }
 
     function _step2SettleTreasuryAndNitro(bytes32) internal {
         vm.startPrank(treasuryOperator);
-        ledger.consumeTreasuryReward(address(token), TREASURY_REWARD);
         token.approve(address(treasuryVault), TREASURY_REWARD);
         treasuryVault.creditTreasury(address(token), TREASURY_REWARD);
         vm.stopPrank();
 
         assertEq(treasuryVault.treasuryBalance(address(token)), TREASURY_REWARD);
-        assertEq(ledger.treasuryRewards(address(token)), 0);
 
         bytes32 channelId = keccak256("channel-1");
         bytes32 stateHash = keccak256("final-state");
@@ -171,18 +158,12 @@ contract FlywheelWorkflowTest is Test {
     }
 
     function _step3WithdrawAndDistribute() internal {
-        vm.prank(rewardFunder);
-        token.approve(address(withdrawalRouter), USER_REWARD);
-        vm.prank(rewardFunder);
-        withdrawalRouter.fundRewards(address(token), USER_REWARD);
-
         uint256 userBalanceBefore = token.balanceOf(user);
         vm.prank(user);
-        withdrawalRouter.withdrawPrincipalAndRewards(address(token), PRINCIPAL_AMOUNT, USER_REWARD, user);
+        withdrawalRouter.withdrawPrincipal(address(token), PRINCIPAL_AMOUNT, user);
 
         assertEq(lpVault.principalOf(user, address(token)), 0);
-        assertEq(ledger.userRewards(user, address(token)), 0);
-        assertEq(token.balanceOf(user), userBalanceBefore + PRINCIPAL_AMOUNT + USER_REWARD);
+        assertEq(token.balanceOf(user), userBalanceBefore + PRINCIPAL_AMOUNT);
 
         uint256 treasuryRecipientBefore = token.balanceOf(treasuryRecipient);
         treasuryVault.withdrawTreasury(address(token), TREASURY_REWARD, treasuryRecipient);
