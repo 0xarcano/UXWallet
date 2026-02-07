@@ -11,7 +11,16 @@
     "backgroundColor": "#0A1628",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.flywheel.wallet"
+      "bundleIdentifier": "com.flywheel.wallet",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "metamask",
+          "trust",
+          "safe",
+          "rainbow",
+          "uniswap"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -35,7 +44,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#0A1628"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
