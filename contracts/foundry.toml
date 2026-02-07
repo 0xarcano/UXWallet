@@ -12,3 +12,6 @@ remappings = [
   "openzeppelin-contracts/=lib/openzeppelin-contracts/",
   "forge-std/=lib/forge-std/src/"
 ]
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
