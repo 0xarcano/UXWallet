@@ -8,9 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 **E-1 (Shared UI Components) complete** — 16 reusable components built with tests (96 tests, 21 suites). Brand colors migrated to official Flywheel palette. Utilities created: `format.ts`, `errors.ts`, `common.ts`, `validation.ts`. Dependencies added: `lucide-react-native`, `react-native-svg`, `expo-clipboard`.
 
-**E-2 (Core Infrastructure) complete** — TypeScript types for all API responses, typed HTTP client (`src/lib/api/`), 4 Zustand stores with persistence (`src/stores/`), 6 TanStack Query hooks (`src/hooks/`), EIP-712 delegation builder (`src/lib/eip712/`), chain config (`src/config/chains.ts`). 212 tests, 37 suites. Dependencies added: `zustand`, `expo-secure-store`, `@react-native-async-storage/async-storage`, `@erc7824/nitrolite`.
+**E-2 (Core Infrastructure) complete** — TypeScript types for all API responses, typed HTTP client (`src/lib/api/`), 4 Zustand stores with persistence (`src/stores/`), 6 TanStack Query hooks (`src/hooks/`), EIP-712 delegation builder (`src/lib/eip712/`), chain config (`src/config/chains.ts`). Dependencies added: `zustand`, `expo-secure-store`, `@react-native-async-storage/async-storage`, `@erc7824/nitrolite`.
 
-See `docs/implementation-records.md` for full status. Remaining dependencies (Wagmi, Reown, etc.) are planned — they will be added as their respective epics begin.
+**E-3 (Wallet Connection) complete** — Reown AppKit 2.0.1 + Wagmi 2.19.5 + Viem 2.45.1 integrated. ConnectWalletScreen with WalletConnect modal, `useWalletSync` hook, navigation guard with store hydration, Settings disconnect. 230 tests, 41 suites. See `docs/architecture/wallet-connection.md` for full integration guide.
+
+See `docs/implementation-records.md` for full status.
 
 ## Context Files
 
@@ -36,14 +38,14 @@ Before writing any code, you MUST review:
 - **Language:** TypeScript ^5.3.3 (installed 5.9.3, strict mode, no `any`)
 - **Navigation:** expo-router 4.0.22 (file-based routing)
 - **Server State:** TanStack React Query 5.62.16
-- **Client State:** Zustand 5.x *(planned — E-2)*
+- **Client State:** Zustand 5.0.11
 - **Forms:** React Hook Form 7.x + Zod 3.23.8 *(RHF planned — E-9)*
-- **Wallet:** Reown AppKit (WalletConnect) + Wagmi 2.x + Viem 2.x *(planned — E-3)*
-- **EIP-712:** `@erc7824/nitrolite` for delegation typed-data *(planned — E-4)*
+- **Wallet:** Reown AppKit 2.0.1 + Wagmi 2.19.5 + Viem 2.45.1 (see `docs/architecture/wallet-connection.md`)
+- **EIP-712:** `@erc7824/nitrolite` 0.5.3 for delegation typed-data
 - **Styling:** NativeWind 4.1.23 (TailwindCSS 3.4.19 for React Native) — custom primitives (ADR-008, no gluestack-ui)
-- **Icons:** lucide-react-native *(planned — E-1)*
+- **Icons:** lucide-react-native 0.563.0
 - **Animations:** react-native-reanimated 3.16.7
-- **Storage:** expo-secure-store (encrypted), AsyncStorage (preferences) *(planned — E-2)*
+- **Storage:** expo-secure-store 15.0.8 (encrypted), AsyncStorage 2.2.0 (preferences)
 - **Testing:** Jest 29.7.0, Testing Library 12.8.1, MSW 2.6.9, Maestro (E2E, planned)
 - **Build:** EAS Build + EAS Submit
 
