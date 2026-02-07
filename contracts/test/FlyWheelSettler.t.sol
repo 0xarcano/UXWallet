@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import {Test} from "forge-std/Test.sol";
 import {MessageHashUtils} from "openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {UXOriginSettler} from "../src/UXOriginSettler.sol";
+import {UXOriginSettler} from "../src/FlywheelSettler.sol";
 import {SessionKeyRegistry} from "../src/onboard/SessionKeyRegistry.sol";
 import {GaslessCrossChainOrder, OnchainCrossChainOrder, Output, ResolvedCrossChainOrder, FillInstruction} from "../src/erc7683/Structs.sol";
 
