@@ -8,7 +8,7 @@
     "scheme": "flywheel",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "backgroundColor": "#0F172A",
+    "backgroundColor": "#0A1628",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.flywheel.wallet"
@@ -16,7 +16,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
+        "backgroundColor": "#0A1628"
       },
       "package": "com.flywheel.wallet"
     },
@@ -33,7 +33,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0F172A"
+          "backgroundColor": "#0A1628"
         }
       ]
     ],

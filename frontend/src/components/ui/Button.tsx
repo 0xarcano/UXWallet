@@ -14,7 +14,7 @@ export function Button({ title, variant = 'primary', ...props }: ButtonProps) {
     ghost: 'bg-transparent',
   };
   const textVariantClasses = {
-    primary: 'text-white',
+    primary: 'text-brand-bg',
     secondary: 'text-white',
     ghost: 'text-brand-primary',
   };

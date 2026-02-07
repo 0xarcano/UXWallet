@@ -202,15 +202,17 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          primary: '#6366F1',    // Indigo-500 — primary action
-          secondary: '#8B5CF6',  // Violet-500 — secondary elements
-          success: '#22C55E',    // Green-500 — confirmations, yield
-          warning: '#F59E0B',    // Amber-500 — caution states
-          error: '#EF4444',      // Red-500 — errors, destructive
-          bg: '#0F172A',         // Slate-900 — dark background
-          card: '#1E293B',       // Slate-800 — card surfaces
-          text: '#F8FAFC',       // Slate-50 — primary text
-          muted: '#94A3B8',      // Slate-400 — secondary text
+          primary: '#00D4AA',    // Electric Teal — primary action
+          secondary: '#7C6FF0',  // Muted Lavender — secondary elements
+          success: '#34D399',    // Green — confirmations, yield
+          warning: '#FBBF24',    // Amber — caution states
+          error: '#F87171',      // Red — errors, destructive
+          bg: '#0A1628',         // Deep Space — dark background
+          card: '#1A2742',       // Card surfaces
+          text: '#F8FAFB',       // Clean White — primary text
+          muted: '#8892A0',      // Soft Slate — secondary text
+          gold: '#FFB547',       // Warm Gold — rewards, yield highlights
+          info: '#60A5FA',       // Info blue — informational states
         },
       },
       fontFamily: {
