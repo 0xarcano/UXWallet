@@ -17,9 +17,11 @@
     "test:watch": "jest --watchAll"
   },
   "dependencies": {
+    "@erc7824/nitrolite": "^0.5.3",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo/vector-icons": "~14.0.4",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@tanstack/react-query": "~5.62.16",
@@ -31,6 +33,7 @@
     "expo-haptics": "~14.0.1",
     "expo-linking": "~7.0.5",
     "expo-router": "~4.0.22",
+    "expo-secure-store": "^15.0.8",
     "expo-splash-screen": "~0.29.24",
     "expo-status-bar": "~2.0.1",
     "expo-symbols": "~0.2.2",
@@ -48,7 +51,8 @@
     "react-native-svg": "15.8.0",
     "react-native-web": "~0.19.13",
     "react-native-webview": "13.12.5",
-    "zod": "~3.23.8"
+    "zod": "~3.23.8",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

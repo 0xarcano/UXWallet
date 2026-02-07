@@ -9,3 +9,5 @@ export const uint256StringSchema = z
   .regex(/^\d+$/, 'Invalid uint256 string');
 
 export const chainIdSchema = z.number().int().positive('Chain ID must be a positive integer');
+
+export const hexStringSchema = z.string().regex(/^0x[a-fA-F0-9]*$/, 'Invalid hex string');

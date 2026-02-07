@@ -1,6 +1,6 @@
 # Flywheel Wallet — Implementation Records
 
-**Last Updated:** 2026-02-07
+**Last Updated:** 2026-02-08
 **Tracks:** [development-backlog.md](development-backlog.md)
 
 ---
@@ -11,7 +11,7 @@
 |------|-------|--------|------------|-------------|-------|
 | E-0 | Project Bootstrap | **Complete** | 12/12 | 12 | ADR-008 replaced gluestack with custom primitives |
 | E-1 | Shared UI Components | **Complete** | 9/9 | 9 | Brand palette migrated, 16 components + 19 test files |
-| E-2 | Core Infrastructure | Not started | 0/10 | 10 | |
+| E-2 | Core Infrastructure | **Complete** | 10/10 | 10 | Types, API client, stores, hooks, EIP-712, chains |
 | E-3 | Wallet Connection | Not started | 0/5 | 5 | |
 | E-4 | EIP-712 Delegation | Not started | 0/7 | 7 | |
 | E-5 | Onboarding Flow | Not started | 0/6 | 6 | |
@@ -21,7 +21,7 @@
 | E-9 | Send (Gasless P2P + Cross-Chain) | Not started | 0/7 | 7 | |
 | E-10 | Withdrawal / Fast Exit | Not started | 0/6 | 6 | |
 | E-11 | Testing, Accessibility & Polish | Not started | 0/5 | 5 | |
-| **Total** | | | **21/86** | **86** | **24% complete** |
+| **Total** | | | **31/86** | **86** | **36% complete** |
 
 ---
 
@@ -370,14 +370,177 @@ Files created or modified during E-0 bootstrap:
 
 ---
 
-## Next Up: E-2 — Core Infrastructure
+## E-2 — Core Infrastructure
 
-Unblocked. Dependencies satisfied by E-1 utilities (`format.ts`, `errors.ts`, `common.ts`).
+**Status:** Complete
+**Date completed:** 2026-02-08
+**Branch:** `feat/ui-shared-components`
+
+### E-2-S1: TypeScript Types & Format Utilities
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S1-T1 | API response types | Done | 7 type files: `api.ts`, `delegation.ts`, `balance.ts`, `withdrawal.ts`, `state.ts`, `health.ts`, `websocket.ts`. All match API spec exactly. |
+| E-2-S1-T2 | `parseAmount()` in format.ts | Done | BigInt-only conversion from display string to `Uint256String`. Validates format, decimal precision. Inverse of `formatBalance()`. |
+| E-2-S1-T3 | Expand errors.ts | Done | Added 16 error codes from API spec (total 22). Exported `ErrorMessage` interface. Covers all backend error codes. |
+
+### E-2-S2: API Client & Validation
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S2-T1 | Typed HTTP client | Done | `src/lib/api/client.ts` — Native `fetch` wrapper. Auto `Content-Type`, `X-Request-Id` via `crypto.randomUUID()`. `ApiClientError` class with `code`, `status`, `details`. 429 handling with `Retry-After`. |
+| E-2-S2-T2 | `hexStringSchema` | Done | Added to `src/lib/validation.ts`. Regex: `^0x[a-fA-F0-9]*$`. |
+| E-2-S2-T3 | API endpoint functions | Done | 5 modules: `health.ts`, `delegation.ts`, `balance.ts`, `withdrawal.ts`, `state.ts`. Barrel file at `index.ts`. 9 typed functions total. |
+
+### E-2-S3: Stores, Hooks, EIP-712 & Chains
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S3-T1 | Zustand stores | Done | 4 stores: `walletStore` (ephemeral), `delegationStore` (SecureStore persist, `skipHydration`), `onboardingStore` (AsyncStorage persist, `skipHydration`), `webSocketStore` (ephemeral). 2 persistence adapters: `secureStoreAdapter.ts`, `asyncStorageAdapter.ts`. |
+| E-2-S3-T2 | TanStack Query hooks | Done | 6 hooks: `useHealth`, `useBalance`, `useDelegation` (query + 2 mutations), `useWithdrawalRequest` + `useWithdrawalStatus` (polling), `useSessions`, `useChannel`. Shared `queryClient` extracted to `src/lib/queryClient.ts`. |
+| E-2-S3-T3 | EIP-712 delegation builder | Done | `src/lib/eip712/delegation.ts` — `buildDelegationTypedData()` using `EIP712AuthTypes` from `@erc7824/nitrolite`. Matches backend verification pattern. |
+| E-2-S3-T4 | Chain definitions | Done | `src/config/chains.ts` — Testnet (Sepolia + Base Sepolia) and Mainnet (Ethereum + Arbitrum One). Switches on `EXPO_PUBLIC_CHAIN_ENV`. Plain config objects (viem `Chain` types deferred to E-3). |
+
+### E-2-S4: Test Infrastructure & MSW
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S4-T1 | Expand MSW handlers | Done | 9 endpoint handlers with test data factories. |
+| E-2-S4-T2 | Test mocks for new deps | Done | Mocks for `expo-secure-store`, `@react-native-async-storage/async-storage`, `@erc7824/nitrolite` in `setup.ts`. |
+
+**Acceptance Criteria:**
+- [x] `pnpm run typecheck` — zero errors
+- [x] `pnpm run lint` — zero errors (6 warnings: `require()` in Jest mocks, pre-existing)
+- [x] `pnpm run test` — 212/212 tests pass (37 suites)
+- [x] Dependencies added: zustand, expo-secure-store, @react-native-async-storage/async-storage, @erc7824/nitrolite
+
+---
+
+## Implementation Notes & Gotchas (E-2)
+
+### Zustand persist with async storage
+- `expo-secure-store` and `@react-native-async-storage/async-storage` are async APIs. Zustand `persist` middleware requires `skipHydration: true` for async storage — call `useStore.persist.rehydrate()` at app startup (will be wired in E-5 onboarding flow).
+
+### ESLint no-non-null-assertion
+- Query hooks use `enabled: !!param` to guard `queryFn`. Since `queryFn` only runs when enabled, the param is guaranteed non-null at runtime. Used `as string` cast instead of `!` to satisfy ESLint's `no-non-null-assertion` rule.
+
+### ApiClientError for 429
+- Rate-limited responses (429) extract `Retry-After` header and include it as `details.retryAfter` (number). UI can use this to display countdown before retry.
+
+---
+
+## Verification Checklist (E-2)
+
+- [x] `pnpm install` succeeds (new deps: zustand, expo-secure-store, async-storage, @erc7824/nitrolite)
+- [x] `pnpm run typecheck` — zero errors
+- [x] `pnpm run lint` — zero errors
+- [x] `pnpm run test` — 212/212 tests pass (37 suites, up from 96/96 in E-1)
+- [x] All 7 type files match API specification
+- [x] API client handles success, error, and 429 responses
+- [x] 4 Zustand stores with appropriate persistence
+- [x] 6 TanStack Query hooks with proper `enabled` guards
+- [x] EIP-712 builder matches backend verification pattern
+- [x] Chain config switches on `EXPO_PUBLIC_CHAIN_ENV`
+
+---
+
+## File Manifest (E-2)
+
+### New files (~30)
+
+#### Type definitions (7)
+| File | Purpose |
+|------|---------|
+| `src/types/api.ts` | Shared API error envelope types |
+| `src/types/delegation.ts` | Delegation domain types (SessionKeyInfo, requests/responses) |
+| `src/types/balance.ts` | Balance domain types (BalanceEntry, response) |
+| `src/types/withdrawal.ts` | Withdrawal domain types (WithdrawalInfo, requests/responses) |
+| `src/types/state.ts` | State channel types (SessionInfo, LatestTransaction) |
+| `src/types/health.ts` | Health check response type |
+| `src/types/websocket.ts` | WebSocket message types (WsServerMessage union) |
+
+#### API client (7)
+| File | Purpose |
+|------|---------|
+| `src/lib/api/client.ts` | Typed HTTP client (apiGet, apiPost, ApiClientError) |
+| `src/lib/api/health.ts` | Health endpoint function |
+| `src/lib/api/delegation.ts` | Delegation endpoint functions (register, revoke, getKeys) |
+| `src/lib/api/balance.ts` | Balance endpoint function |
+| `src/lib/api/withdrawal.ts` | Withdrawal endpoint functions (request, getStatus) |
+| `src/lib/api/state.ts` | State endpoint functions (getChannel, getSessions) |
+| `src/lib/api/index.ts` | Barrel re-export |
+
+#### Stores (6)
+| File | Purpose |
+|------|---------|
+| `src/stores/lib/secureStoreAdapter.ts` | expo-secure-store Zustand StateStorage adapter |
+| `src/stores/lib/asyncStorageAdapter.ts` | AsyncStorage Zustand StateStorage adapter |
+| `src/stores/walletStore.ts` | Wallet connection state (ephemeral) |
+| `src/stores/delegationStore.ts` | Delegation state (SecureStore persisted) |
+| `src/stores/onboardingStore.ts` | Onboarding progress (AsyncStorage persisted) |
+| `src/stores/webSocketStore.ts` | WebSocket connection state (ephemeral) |
+
+#### Hooks (6)
+| File | Purpose |
+|------|---------|
+| `src/hooks/useHealth.ts` | Health query hook |
+| `src/hooks/useBalance.ts` | Balance query hook |
+| `src/hooks/useDelegation.ts` | Delegation query + mutations hook |
+| `src/hooks/useWithdrawal.ts` | Withdrawal mutation + polling hook |
+| `src/hooks/useSessions.ts` | Sessions query hook |
+| `src/hooks/useChannel.ts` | Channel query hook |
+
+#### Config & utilities (3)
+| File | Purpose |
+|------|---------|
+| `src/lib/queryClient.ts` | Shared QueryClient instance |
+| `src/lib/eip712/delegation.ts` | EIP-712 delegation typed-data builder |
+| `src/config/chains.ts` | Chain definitions (testnet/mainnet) |
+
+### Modified files (7)
+| File | Changes |
+|------|---------|
+| `package.json` | Added zustand, expo-secure-store, async-storage, @erc7824/nitrolite |
+| `src/lib/format.ts` | Added `parseAmount()` |
+| `src/lib/errors.ts` | Added 16 error codes, exported `ErrorMessage` interface |
+| `src/lib/validation.ts` | Added `hexStringSchema` |
+| `src/providers/AppProviders.tsx` | Import queryClient from `src/lib/queryClient.ts` |
+| `src/test/msw/handlers.ts` | Full API handlers + test data factories |
+| `src/test/setup.ts` | Mocks for secure-store, async-storage, nitrolite |
+| `jest.config.js` | Added new packages to transformIgnorePatterns |
+
+### New test files (16)
+| File | Tests |
+|------|-------|
+| `src/types/__tests__/api-types.test.ts` | 20 |
+| `src/lib/__tests__/format.test.ts` | 20 (was 10, +10 for parseAmount) |
+| `src/lib/__tests__/errors.test.ts` | 24 (was 6, +18 for new codes) |
+| `src/lib/__tests__/validation.test.ts` | 12 |
+| `src/lib/api/__tests__/client.test.ts` | 8 |
+| `src/lib/api/__tests__/endpoints.test.ts` | 11 |
+| `src/stores/__tests__/walletStore.test.ts` | 3 |
+| `src/stores/__tests__/delegationStore.test.ts` | 6 |
+| `src/stores/__tests__/onboardingStore.test.ts` | 4 |
+| `src/stores/__tests__/webSocketStore.test.ts` | 3 |
+| `src/hooks/__tests__/useHealth.test.ts` | 1 |
+| `src/hooks/__tests__/useBalance.test.ts` | 2 |
+| `src/hooks/__tests__/useDelegation.test.ts` | 3 |
+| `src/hooks/__tests__/useWithdrawal.test.ts` | 3 |
+| `src/hooks/__tests__/useSessions.test.ts` | 2 |
+| `src/hooks/__tests__/useChannel.test.ts` | 2 |
+| `src/lib/eip712/__tests__/delegation.test.ts` | 5 |
+| `src/config/__tests__/chains.test.ts` | 4 |
+
+---
+
+## Next Up: E-3 — Wallet Connection
+
+Unblocked by E-2. Dependencies to install: `wagmi`, `viem`, `@reown/appkit`.
 
 | Story | Key Deliverables |
 |-------|-----------------|
-| E-2-S1 | Zustand stores (walletStore, delegationStore, onboardingStore, webSocketStore) |
-| E-2-S2 | Typed HTTP client (`src/lib/api/client.ts`), API modules (delegation, balance, withdrawal, state, health) |
-| E-2-S3 | TanStack Query hooks (useBalance, useDelegation, useWithdrawal, useSessions, useChannel, useHealth) |
-| E-2-S4 | WebSocket client (`src/lib/ws/`) + Query cache sync |
-| E-2-S5 | Expand utilities (format.ts, errors.ts) with additional helpers |
+| E-3-S1 | Install wagmi, viem, @reown/appkit |
+| E-3-S2 | Configure WagmiProvider with supported chains |
+| E-3-S3 | Create ConnectWalletButton component |
+| E-3-S4 | Wire wallet connection to walletStore |
+| E-3-S5 | Add WalletConnect modal integration |

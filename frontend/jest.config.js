@@ -10,6 +10,6 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(.pnpm|((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|nativewind|react-native-reanimated|react-native-gesture-handler|react-native-safe-area-context|react-native-screens|@tanstack/react-query|react-native-css-interop|lucide-react-native|react-native-svg|expo-clipboard))',
+    'node_modules/(?!(.pnpm|((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|nativewind|react-native-reanimated|react-native-gesture-handler|react-native-safe-area-context|react-native-screens|@tanstack/react-query|react-native-css-interop|lucide-react-native|react-native-svg|expo-clipboard|zustand|expo-secure-store|@react-native-async-storage/async-storage|@erc7824/nitrolite))',
   ],
 };

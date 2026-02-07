@@ -8,7 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 **E-1 (Shared UI Components) complete** — 16 reusable components built with tests (96 tests, 21 suites). Brand colors migrated to official Flywheel palette. Utilities created: `format.ts`, `errors.ts`, `common.ts`, `validation.ts`. Dependencies added: `lucide-react-native`, `react-native-svg`, `expo-clipboard`.
 
-See `docs/implementation-records.md` for full status. Many dependencies (Zustand, Wagmi, Reown, etc.) are planned but not yet installed — they will be added as their respective epics begin.
+**E-2 (Core Infrastructure) complete** — TypeScript types for all API responses, typed HTTP client (`src/lib/api/`), 4 Zustand stores with persistence (`src/stores/`), 6 TanStack Query hooks (`src/hooks/`), EIP-712 delegation builder (`src/lib/eip712/`), chain config (`src/config/chains.ts`). 212 tests, 37 suites. Dependencies added: `zustand`, `expo-secure-store`, `@react-native-async-storage/async-storage`, `@erc7824/nitrolite`.
+
+See `docs/implementation-records.md` for full status. Remaining dependencies (Wagmi, Reown, etc.) are planned — they will be added as their respective epics begin.
 
 ## Context Files
 
