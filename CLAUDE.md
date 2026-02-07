@@ -14,7 +14,7 @@ Four independent sub-projects sharing a git repo:
 
 | Sub-project | Stack | Purpose |
 |-------------|-------|---------|
-| `frontend/` | Expo SDK 52, React Native, TypeScript, NativeWind | Wallet mobile app (planning/docs phase — no code yet) |
+| `frontend/` | Expo SDK 52, React Native 0.76.9, TypeScript 5.9, NativeWind 4.1 | Wallet mobile app (E-0 bootstrap complete, E-1+ in progress) |
 | `backend/` | Node.js, Fastify, Prisma, Viem, TypeScript | ClearNode, Solver, KMS |
 | `contracts/` | Solidity 0.8.33, Foundry | Custody & settlement smart contracts |
 | `lif-rust/` | Rust, Axum, Alloy, Tokio | LiFi integration microservice |
@@ -71,15 +71,17 @@ cargo test                     # Tests
 Env vars: `LIFI_API_URL` (default: `https://li.quest/v1`), `LIFI_API_KEY`, `PORT` (default: 8080).
 
 ### Frontend (`frontend/`)
-Currently in planning/documentation phase — no package.json or source code yet. See `frontend/CLAUDE.md`, `frontend/.context/`, and `frontend/docs/architecture/` for architecture and standards.
+E-0 bootstrap complete. Uses pnpm (ADR-005). See `frontend/CLAUDE.md` and `frontend/docs/` for full details.
 ```bash
-npx expo install                # Install dependencies (Expo-managed versions)
+pnpm install                    # Install dependencies
 npx expo start                  # Start dev server
 npx expo start --ios            # iOS simulator
 npx expo start --android        # Android emulator
-npm run lint                    # ESLint
-npm run test                    # Jest unit tests
-npx maestro test e2e/           # E2E tests
+npx expo start --web            # Web (verified working)
+pnpm run lint                   # ESLint
+pnpm run test                   # Jest unit tests (3 tests, 2 suites)
+pnpm run typecheck              # TypeScript strict check
+npx maestro test e2e/           # E2E tests (not yet configured)
 ```
 
 ## Architecture

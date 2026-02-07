@@ -7,8 +7,10 @@ out/
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
-# Docs
+# Docs (contracts Foundry docs output)
 docs/
+# But keep frontend docs (architecture, ADRs, implementation records)
+!frontend/docs/
 
 # Dotenv file
 .env

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Project Status
 
-**Planning/documentation phase** — architecture, standards, and specs are defined in `.context/` and `docs/` but no source code or `package.json` exists yet. When bootstrapping, follow the structure in `docs/architecture/architecture.md`.
+**E-0 (Project Bootstrap) complete** — Expo SDK 52 project scaffolded with routing, styling, providers, testing, and dev tooling. See `docs/implementation-records.md` for full status. Web version verified working. Many dependencies (Zustand, Wagmi, Reown, etc.) are planned but not yet installed — they will be added as their respective epics begin.
 
 ## Context Files
 
@@ -26,19 +26,19 @@ Before writing any code, you MUST review:
 
 ## Tech Stack
 
-- **Runtime:** Expo SDK 52, React Native 0.76, React 18.3
-- **Language:** TypeScript 5.6 (strict mode, no `any`)
-- **Navigation:** expo-router 4.x (file-based routing)
-- **Server State:** TanStack React Query 5.x
-- **Client State:** Zustand 5.x
-- **Forms:** React Hook Form 7.x + Zod 3.x
-- **Wallet:** Reown AppKit (WalletConnect) + Wagmi 2.x + Viem 2.x
-- **EIP-712:** `@erc7824/nitrolite` for delegation typed-data
-- **Styling:** NativeWind 4.x (TailwindCSS for React Native) + gluestack-ui 2.x
-- **Icons:** lucide-react-native
-- **Animations:** react-native-reanimated 3.x
-- **Storage:** expo-secure-store (encrypted), AsyncStorage (preferences)
-- **Testing:** Jest 29.x, Testing Library, MSW 2.x, Maestro (E2E)
+- **Runtime:** Expo SDK 52.0.49, React Native 0.76.9, React 18.3.1
+- **Language:** TypeScript ^5.3.3 (installed 5.9.3, strict mode, no `any`)
+- **Navigation:** expo-router 4.0.22 (file-based routing)
+- **Server State:** TanStack React Query 5.62.16
+- **Client State:** Zustand 5.x *(planned — E-2)*
+- **Forms:** React Hook Form 7.x + Zod 3.23.8 *(RHF planned — E-9)*
+- **Wallet:** Reown AppKit (WalletConnect) + Wagmi 2.x + Viem 2.x *(planned — E-3)*
+- **EIP-712:** `@erc7824/nitrolite` for delegation typed-data *(planned — E-4)*
+- **Styling:** NativeWind 4.1.23 (TailwindCSS 3.4.19 for React Native) — custom primitives (ADR-008, no gluestack-ui)
+- **Icons:** lucide-react-native *(planned — E-1)*
+- **Animations:** react-native-reanimated 3.16.7
+- **Storage:** expo-secure-store (encrypted), AsyncStorage (preferences) *(planned — E-2)*
+- **Testing:** Jest 29.7.0, Testing Library 12.8.1, MSW 2.6.9, Maestro (E2E, planned)
 - **Build:** EAS Build + EAS Submit
 
 See `docs/architecture/tech-stack.md` for the full dependency matrix.
