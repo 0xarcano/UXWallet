@@ -12,19 +12,19 @@
 | Language | TypeScript | ^5.3.3 (resolved 5.9.3) | Installed |
 | Navigation | expo-router | 4.0.22 | Installed |
 | Server State | TanStack React Query | 5.62.16 | Installed |
-| Client State | Zustand | 5.x | **Not yet installed** (E-2) |
+| Client State | Zustand | 5.0.11 | Installed |
 | Forms | React Hook Form | 7.x | **Not yet installed** (E-9) |
 | Validation | Zod | 3.23.8 | Installed |
-| Wallet Connection | Reown AppKit (WalletConnect) | latest | **Not yet installed** (E-3) |
-| Wallet Hooks | Wagmi | 2.x | **Not yet installed** (E-3) |
-| Ethereum Utils | Viem | 2.x | **Not yet installed** (E-3) |
-| EIP-712 Types | @erc7824/nitrolite | latest | **Not yet installed** (E-4) |
+| Wallet Connection | Reown AppKit (WalletConnect) | 2.0.1 | Installed (E-3) |
+| Wallet Hooks | Wagmi | 2.19.5 | Installed (E-3) |
+| Ethereum Utils | Viem | 2.45.1 | Installed (E-3) |
+| EIP-712 Types | @erc7824/nitrolite | 0.5.3 | Installed |
 | Styling | NativeWind | 4.1.23 | Installed |
 | UI Primitives | Custom NativeWind components | — | ADR-008 (replaces gluestack-ui) |
 | Icons | lucide-react-native | ^0.563.0 | Installed (E-1) |
 | Animations | react-native-reanimated | 3.16.7 | Installed |
-| Secure Storage | expo-secure-store | ~52.x | **Not yet installed** (E-2) |
-| Async Storage | @react-native-async-storage/async-storage | 2.x | **Not yet installed** (E-2) |
+| Secure Storage | expo-secure-store | 15.0.8 | Installed |
+| Async Storage | @react-native-async-storage/async-storage | 2.2.0 | Installed |
 | Build System | EAS Build + EAS Submit | latest | — |
 
 ## Dependency Matrix
@@ -51,7 +51,7 @@
 | Package | Version | Installed | Purpose |
 |---------|---------|-----------|---------|
 | `@tanstack/react-query` | ~5.62.16 | 5.62.16 | Server state, caching, background refetch, optimistic updates |
-| `zustand` | ~5.0 | **Not yet** (E-2) | Lightweight client state (wallet, delegation, WS status) |
+| `zustand` | ~5.0.11 | 5.0.11 | Lightweight client state (wallet, delegation, WS status) |
 
 ### Forms & Validation
 
@@ -65,11 +65,15 @@
 
 | Package | Version | Installed | Purpose |
 |---------|---------|-----------|---------|
-| `@reown/appkit` | latest | **Not yet** (E-3) | WalletConnect modal, session management |
-| `@reown/appkit-adapter-wagmi` | latest | **Not yet** (E-3) | Wagmi adapter for Reown AppKit |
-| `wagmi` | ~2.14 | **Not yet** (E-3) | React hooks for Ethereum (useAccount, useSignTypedData) |
-| `viem` | ~2.21 | **Not yet** (E-3) | Ethereum utilities (address validation, hex encoding, ABI) |
-| `@erc7824/nitrolite` | latest | **Not yet** (E-4) | `EIP712AuthTypes` for delegation typed-data signing |
+| `@reown/appkit-react-native` | ^2.0.1 | 2.0.1 | WalletConnect modal, session management, `useAppKit`/`useAccount` hooks |
+| `@reown/appkit-wagmi-react-native` | ^2.0.1 | 2.0.1 | Wagmi adapter bridge for Reown AppKit |
+| `wagmi` | ^2.19.5 | 2.19.5 | React hooks for Ethereum (useAccount, useSignTypedData). **Must be v2** — Reown adapter requires `>=2 <3.0.0`. |
+| `viem` | ^2.45.1 | 2.45.1 | Ethereum utilities (chain defs, address validation, ABI). Override in `package.json` prevents duplicate sub-dep versions. |
+| `@walletconnect/react-native-compat` | ^2.23.4 | 2.23.4 | React Native compatibility shims for WalletConnect |
+| `react-native-get-random-values` | ~1.11.0 | 1.11.0 | `crypto.getRandomValues` polyfill for WalletConnect |
+| `@react-native-community/netinfo` | 11.4.1 | 11.4.1 | Network info (Reown AppKit dependency) |
+| `expo-application` | ~6.0.2 | 6.0.2 | Application metadata (Reown AppKit dependency) |
+| `@erc7824/nitrolite` | 0.5.3 | 0.5.3 | `EIP712AuthTypes` for delegation typed-data signing |
 
 ### UI & Styling
 
@@ -89,8 +93,8 @@
 
 | Package | Version | Installed | Purpose |
 |---------|---------|-----------|---------|
-| `expo-secure-store` | ~52.0 | **Not yet** (E-2) | Encrypted key-value store (delegation metadata, session tokens) |
-| `@react-native-async-storage/async-storage` | ~2.1 | **Not yet** (E-2) | Unencrypted key-value store (preferences, theme, onboarding state) |
+| `expo-secure-store` | ~15.0.8 | 15.0.8 | Encrypted key-value store (delegation metadata, session tokens) |
+| `@react-native-async-storage/async-storage` | ~2.2.0 | 2.2.0 | Unencrypted key-value store (preferences, theme, onboarding state) |
 
 ### Networking
 

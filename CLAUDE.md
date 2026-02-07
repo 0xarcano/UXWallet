@@ -14,7 +14,7 @@ Four independent sub-projects sharing a git repo:
 
 | Sub-project | Stack | Purpose |
 |-------------|-------|---------|
-| `frontend/` | Expo SDK 52, React Native 0.76.9, TypeScript 5.9, NativeWind 4.1 | Wallet mobile app (E-0 bootstrap complete, E-1+ in progress) |
+| `frontend/` | Expo SDK 52, React Native 0.76.9, TypeScript 5.9, NativeWind 4.1, Wagmi 2.19.5, Viem 2.45.1 | Wallet mobile app (E-0/E-1/E-2/E-3 complete; 230 tests, 41 suites) |
 | `backend/` | Node.js, Fastify, Prisma, Viem, TypeScript | ClearNode, Solver, KMS |
 | `contracts/` | Solidity 0.8.33, Foundry | Custody & settlement smart contracts |
 | `lif-rust/` | Rust, Axum, Alloy, Tokio | LiFi integration microservice |
@@ -29,23 +29,23 @@ Each sub-project has its own build system and dependencies. `backend/`, `fronten
 cd backend && docker compose up -d
 
 # Setup
-npm install
+pnpm install
 cp .env.example .env          # then configure
-npm run db:generate            # Prisma client generation
-npm run db:migrate             # Run migrations
-npm run db:push                # Push schema directly to DB
+pnpm run db:generate           # Prisma client generation
+pnpm run db:migrate            # Run migrations
+pnpm run db:push               # Push schema directly to DB
 
 # Development
-npm run dev                    # tsx watch mode on port 3000
+pnpm run dev                   # tsx watch mode on port 3000
 
 # Build & Production
-npm run build                  # tsc
-npm start                      # node dist/index.js
+pnpm run build                 # tsc
+pnpm start                     # node dist/index.js
 
 # Quality
-npm run test                   # Vitest unit tests
-npm run test:watch             # Watch mode
-npm run test:integration       # Integration tests (separate config)
+pnpm run test                  # Vitest unit tests
+pnpm run test:watch            # Watch mode
+pnpm run test:integration      # Integration tests (separate config)
 ```
 
 ### Contracts (`contracts/`)
@@ -58,9 +58,11 @@ anvil                          # Local dev node
 
 # Deployment (requires .env with PRIVATE_KEY and RPC_URL)
 source .env
+forge script script/DeployFlywheelProtocol.s.sol:DeployFlywheelProtocol --rpc-url $RPC_URL --broadcast
 forge script script/SessionKeyRegistry.s.sol:SessionKeyRegistryScript --rpc-url $RPC_URL --broadcast
+forge script script/DeployMockERC20.s.sol:DeployMockERC20 --rpc-url $RPC_URL --broadcast
 ```
-Uses git submodules for dependencies (forge-std, openzeppelin-contracts, openzeppelin-contracts-upgradeable).
+Uses OpenZeppelin contracts (AccessControl, IERC20) via Foundry dependencies.
 
 ### lif-rust (`lif-rust/`)
 ```bash
@@ -71,7 +73,7 @@ cargo test                     # Tests
 Env vars: `LIFI_API_URL` (default: `https://li.quest/v1`), `LIFI_API_KEY`, `PORT` (default: 8080).
 
 ### Frontend (`frontend/`)
-E-0 bootstrap complete. Uses pnpm (ADR-005). See `frontend/CLAUDE.md` and `frontend/docs/` for full details.
+E-0/E-1/E-2/E-3 complete. Uses pnpm (ADR-005). See `frontend/CLAUDE.md` and `frontend/docs/` for full details.
 ```bash
 pnpm install                    # Install dependencies
 npx expo start                  # Start dev server
@@ -79,7 +81,7 @@ npx expo start --ios            # iOS simulator
 npx expo start --android        # Android emulator
 npx expo start --web            # Web (verified working)
 pnpm run lint                   # ESLint
-pnpm run test                   # Jest unit tests (3 tests, 2 suites)
+pnpm run test                   # Jest unit tests (230 tests, 41 suites)
 pnpm run typecheck              # TypeScript strict check
 npx maestro test e2e/           # E2E tests (not yet configured)
 ```
@@ -118,17 +120,32 @@ npx maestro test e2e/           # E2E tests (not yet configured)
 `GET /health`, `POST /lifi/quote`, `POST /intent/build`, `POST /intent/calldata`
 
 ### Smart Contracts
-- **UXOriginSettler**: ERC-7683 cross-chain order handling with LiFi adapter, ECDSA signature verification, nonce-based replay protection, session key spend-cap enforcement via SessionKeyRegistry
-- **SessionKeyRegistry**: On-chain session key registry with EIP-712 signature-based registration, per-token spend caps, expiry, and instant revocation. Used by UXOriginSettler to validate delegated operations.
-- **LifiAdapter**: Wrapper for LiFi integration with role-based access control (`SETTLER_ROLE`)
+
+Organized under `contracts/src/` in four directories:
+
+**`flywheel/`** — Core protocol infrastructure:
+- **FlywheelProtocol**: Facade contract coordinating deposits, session-key registration, solver fills, reward splitting (50/50 user/treasury), Nitro settlement, and withdrawals (auto-claims pending rewards)
+- **LPVault**: User principal custody, router-gated `depositFor`/`withdrawFor` (isolated from treasury)
+- **TreasuryVault**: Treasury-only balances, reward distributor credit path, admin-only withdrawal
+- **NitroSettlementAdapter**: Role-gated passthrough to Nitro Adjudicator/Custody contracts
+
+**`intents/`** — ERC-7683 cross-chain intent settlement:
+- **IntentSettler**: `open()` (direct user) and `openFor()` (relayer + session key + cap enforcement), nonce-based replay protection
+- **LifiAdapter**: Optional role-gated bridge to LiFi InputSettler
+
+**`onboard/`** — Session key delegation:
+- **SessionKeyRegistry**: EIP-712 signed registration, per-token per-session-key spend caps, expiry, instant revocation, nonce replay protection
+
+**`mocks/`** — Testing utilities:
+- **MockERC20**: Mintable ERC20 for dev/testnet
 
 ### Database (Prisma/PostgreSQL)
 Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInventory`, `IntentLog`, `YieldLog`, `WithdrawalRequest`. Key enums: `SessionStatus`, `SessionKeyStatus`, `TransactionType`, `IntentStatus`, `WithdrawalStatus`, `FulfillmentSource`. Schema at `backend/prisma/schema.prisma`.
 
 ## Development Phases
 
-- **Phase 1 (current)**: Testnets (Sepolia + Arbitrum Sepolia). Yellow/Nitrolite fully implemented; LiFi components mocked.
-- **Phase 2**: Mainnet (Ethereum + Arbitrum). Full LiFi marketplace integration via lif-rust.
+- **Phase 1 (current)**: Testnets (Sepolia + Base Sepolia). Yellow/Nitrolite fully implemented; LiFi components mocked.
+- **Phase 2**: Mainnet (Ethereum + Arbitrum One). Full LiFi marketplace integration via lif-rust.
 
 ## Context Documentation
 

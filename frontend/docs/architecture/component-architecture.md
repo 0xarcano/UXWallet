@@ -6,32 +6,43 @@
 
 Providers are composed in `src/providers/AppProviders.tsx` and wrapped in `app/_layout.tsx`:
 
-**Current (E-0 bootstrap):**
+**Current (after E-3):**
 ```
 GestureHandlerRootView
-└── QueryClientProvider (TanStack Query)
-    └── SafeAreaProvider
-        └── expo-router <Slot />
-```
-
-**Target (after E-3 / E-7):**
-```
-ErrorBoundary
-└── GestureHandlerRootView
+└── WagmiProvider (wagmiAdapter.wagmiConfig)        ← E-3
     └── QueryClientProvider (TanStack Query)
-        └── WagmiProvider + Reown AppKit          ← E-3
-            └── WebSocketProvider (WS lifecycle)   ← E-7
+        └── AppKitProvider (instance={appkit})       ← E-3
+            └── WalletSync (side-effect component)   ← E-3
                 └── SafeAreaProvider
                     └── expo-router <Slot />
 ```
 
+**Target (after E-7):**
+```
+ErrorBoundary
+└── GestureHandlerRootView
+    └── WagmiProvider (wagmiAdapter.wagmiConfig)
+        └── QueryClientProvider (TanStack Query)
+            └── AppKitProvider (instance={appkit})
+                └── WalletSync
+                    └── WebSocketProvider (WS lifecycle)   ← E-7
+                        └── SafeAreaProvider
+                            └── expo-router <Slot />
+```
+
 **Rationale for ordering:**
 - `ErrorBoundary` is outermost to catch any provider initialization errors (to be added)
-- `QueryClientProvider` must wrap `WebSocketProvider` (WS provider writes to query cache)
-- `WagmiProvider` must wrap any component using `useAccount` or `useSignTypedData`
-- `WebSocketProvider` connects after wallet is available (reads `userAddress` from Wagmi)
+- `WagmiProvider` wraps everything — wagmi hooks need the config context
+- `QueryClientProvider` inside WagmiProvider — wagmi v2 uses TanStack Query internally
+- `AppKitProvider` provides Reown modal context and hooks (`useAppKit`, `useAccount`)
+- `WalletSync` runs inside both Wagmi and AppKit to sync connection state to Zustand
+- `WebSocketProvider` connects after wallet is available (reads `userAddress` from walletStore)
+
+Additionally, `<AppKit />` (the modal component) is rendered in `app/_layout.tsx` alongside `<Slot />` — it must be inside `AppProviders` but outside the router.
 
 > **ADR-008:** GluestackUIProvider was removed from the hierarchy. Custom NativeWind primitives are used instead — no provider needed for styling.
+
+See `docs/architecture/wallet-connection.md` for full Reown AppKit + Wagmi configuration details.
 
 ---
 

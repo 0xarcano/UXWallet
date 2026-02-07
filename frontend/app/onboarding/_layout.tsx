@@ -5,8 +5,13 @@ export default function OnboardingLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#0F172A' },
+        contentStyle: { backgroundColor: '#0A1628' },
       }}
-    />
+    >
+      <Stack.Screen name="connect" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="delegate" />
+      <Stack.Screen name="select-tokens" />
+      <Stack.Screen name="unify" />
+    </Stack>
   );
 }

@@ -1,17 +1,22 @@
-import 'react-native-get-random-values';
-import '@walletconnect/react-native-compat';
 import '../global.css';
 
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { JetBrainsMono_400Regular, JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_700Bold,
+} from '@expo-google-fonts/jetbrains-mono';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-
-import { AppKit } from '@reown/appkit-react-native';
 
 import { AppProviders } from '@/providers/AppProviders';
 
@@ -42,7 +47,6 @@ export default function RootLayout() {
     <ThemeProvider value={DarkTheme}>
       <AppProviders>
         <Slot />
-        <AppKit />
         <StatusBar style="light" />
       </AppProviders>
     </ThemeProvider>

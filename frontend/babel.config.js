@@ -5,11 +5,14 @@ module.exports = function (api) {
 
   if (isTest) {
     return {
-      presets: ['babel-preset-expo'],
+      presets: [['babel-preset-expo', { unstable_transformImportMeta: true }]],
     };
   }
 
   return {
-    presets: [['babel-preset-expo', { jsxImportSource: 'nativewind' }], 'nativewind/babel'],
+    presets: [
+      ['babel-preset-expo', { jsxImportSource: 'nativewind', unstable_transformImportMeta: true }],
+      'nativewind/babel',
+    ],
   };
 };
