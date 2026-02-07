@@ -20,6 +20,7 @@ Full details in `../docs/architecture/security.md`.
 - Clear SecureStore data on wallet disconnect.
 - Treat `sessionKeyAddress` as sensitive (store in SecureStore, not AsyncStorage).
 - Use EIP-712 signed typed data for all Nitrolite interactions.
+- Session keys are enforced on-chain via `SessionKeyRegistry` (per-token spend caps, expiry, revocation). The frontend does not bypass these limits — the backend and contracts enforce them together.
 
 ## Runtime Security
 

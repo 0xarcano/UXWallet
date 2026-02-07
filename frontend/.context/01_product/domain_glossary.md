@@ -4,8 +4,9 @@
 |------|------------|
 | **Flywheel Wallet** | The user-facing mobile app (this frontend): delegate, unified balance, send, withdraw. |
 | **Unified Balance** | Sum of user assets across supported chains, shown as a single value per asset (with optional per-chain breakdown). |
-| **Session Key (Yellow)** | One-time EIP-712 delegation so the Flywheel Solver can fulfill intents automatically; user grants in the app (application, scope, allowances, expiry). |
-| **Delegation Flow** | One-time onboarding: user signs EIP-712 typed data to create a Persistent Session Key enabling autonomous Solver operations. |
+| **Session Key (Yellow)** | One-time EIP-712 delegation so the Flywheel Solver can fulfill intents automatically; user grants in the app (application, scope, allowances, expiry). Registered on-chain via `SessionKeyRegistry` contract with per-token spend caps. |
+| **SessionKeyRegistry** | On-chain contract that stores session key registrations, per-token spend caps, expiry, and revocation state. UXOriginSettler validates session keys against this registry before executing delegated orders. |
+| **Delegation Flow** | One-time onboarding: user signs EIP-712 typed data → backend calls `SessionKeyRegistry.registerSessionKeyWithSig()` to register on-chain → Session Key enables autonomous Solver operations with enforced spend limits. |
 | **ClearNode** | Backend service providing Nitrolite session management and real-time updates (WebSocket `bu` events) for balance and progress. |
 | **Flywheel Solver** | Just-In-Time bot that fulfills intents using the Aggregated Liquidity Pool; falls back to LiFi marketplace when pool cannot fulfill. |
 | **Flywheel Treasury** | Receives 50% of intent-fulfillment rewards; part of pool liquidity; only withdrawable by system owners. User funds are always protected. |

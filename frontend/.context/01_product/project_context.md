@@ -83,6 +83,7 @@ If backend/ClearNode is unavailable, user can present last signed state to the o
 
 ## Integration Standards
 
-1. **ABI sync:** After contract deployment, ABIs are exported. Frontend uses Viem for any ABI needs.
-2. **State persistence:** Backend persists latest signed Nitrolite state for recovery. Frontend stores only Session Key metadata in SecureStore.
-3. **Environment:** All config via `EXPO_PUBLIC_*` env vars. Never embed secrets in client bundle.
+1. **ABI sync:** After contract deployment, ABIs are exported. Frontend uses Viem for any ABI needs. Key contracts: `UXOriginSettler`, `SessionKeyRegistry`, `LifiAdapter`.
+2. **On-chain delegation:** Session keys are registered on-chain via `SessionKeyRegistry` (EIP-712 signature). The contract enforces per-token spend caps and expiry. The frontend triggers registration through backend delegation APIs — it does not call the contract directly.
+3. **State persistence:** Backend persists latest signed Nitrolite state for recovery. Frontend stores only Session Key metadata in SecureStore.
+4. **Environment:** All config via `EXPO_PUBLIC_*` env vars. Never embed secrets in client bundle.

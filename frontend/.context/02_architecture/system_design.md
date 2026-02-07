@@ -38,7 +38,7 @@
 | App | Backend | REST (HTTPS) | Delegation, balance, withdrawal, state queries |
 | App | Backend | WebSocket (WSS) | Real-time `bu` (balance update) events |
 | App | Wallet App | WalletConnect (Reown) | EIP-712 signature requests |
-| Backend | Contracts | JSON-RPC (Viem) | On-chain settlement, custody |
+| Backend | Contracts | JSON-RPC (Viem) | On-chain settlement, custody, session key registration (SessionKeyRegistry) |
 | Backend | lif-rust | REST | Intent building (Phase 2, mocked Phase 1) |
 
 ## State Management — Three-Layer Model

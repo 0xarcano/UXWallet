@@ -52,8 +52,8 @@ npx expo install                # Install dependencies (Expo-managed versions)
 npx expo start                  # Start dev server (Expo Go or dev client)
 npx expo start --ios            # Start on iOS simulator
 npx expo start --android        # Start on Android emulator
-npm run lint                    # ESLint
-npm run test                    # Jest unit tests
+pnpm run lint                    # ESLint
+pnpm run test                    # Jest unit tests
 npx maestro test e2e/           # E2E tests (requires dev build)
 eas build --platform ios        # Cloud build for iOS
 eas build --platform android    # Cloud build for Android
@@ -84,6 +84,7 @@ Managed via `expo-constants` and `.env` files. Prefix with `EXPO_PUBLIC_`:
 - **Three-layer state:** Ephemeral (React state) → Client (Zustand) → Server (TanStack Query)
 - **Real-time:** WebSocket `bu` events sync directly into TanStack Query cache
 - **Phase boundaries:** Phase 1 = testnet (Sepolia + Base Sepolia), LiFi mocked. Phase 2 = mainnet, full LiFi.
+- **On-chain delegation:** Session keys are registered on-chain via `SessionKeyRegistry` contract (EIP-712 signature, per-token spend caps, expiry/revocation). The frontend triggers registration through backend delegation APIs.
 
 ## Deployment
 

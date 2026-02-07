@@ -55,6 +55,10 @@ forge test                     # Run tests
 forge fmt                      # Format
 forge snapshot                 # Gas snapshots
 anvil                          # Local dev node
+
+# Deployment (requires .env with PRIVATE_KEY and RPC_URL)
+source .env
+forge script script/SessionKeyRegistry.s.sol:SessionKeyRegistryScript --rpc-url $RPC_URL --broadcast
 ```
 Uses git submodules for dependencies (forge-std, openzeppelin-contracts, openzeppelin-contracts-upgradeable).
 
@@ -112,8 +116,9 @@ npx maestro test e2e/           # E2E tests
 `GET /health`, `POST /lifi/quote`, `POST /intent/build`, `POST /intent/calldata`
 
 ### Smart Contracts
-- **UXOriginSettler**: ERC-7683 cross-chain order handling with LiFi adapter, ECDSA signature verification, nonce-based replay protection
-- **LifiAdapter**: Wrapper for LiFi integration
+- **UXOriginSettler**: ERC-7683 cross-chain order handling with LiFi adapter, ECDSA signature verification, nonce-based replay protection, session key spend-cap enforcement via SessionKeyRegistry
+- **SessionKeyRegistry**: On-chain session key registry with EIP-712 signature-based registration, per-token spend caps, expiry, and instant revocation. Used by UXOriginSettler to validate delegated operations.
+- **LifiAdapter**: Wrapper for LiFi integration with role-based access control (`SETTLER_ROLE`)
 
 ### Database (Prisma/PostgreSQL)
 Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInventory`, `IntentLog`, `YieldLog`, `WithdrawalRequest`. Key enums: `SessionStatus`, `SessionKeyStatus`, `TransactionType`, `IntentStatus`, `WithdrawalStatus`, `FulfillmentSource`. Schema at `backend/prisma/schema.prisma`.
