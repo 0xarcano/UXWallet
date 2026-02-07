@@ -7,8 +7,8 @@ Full standards in `../docs/architecture/coding-standards.md`.
 | **Runtime** | Expo SDK 52, React Native 0.76. |
 | **Language** | TypeScript 5.6, strict mode (`"strict": true`, `"noUncheckedIndexedAccess": true`). |
 | **Styling** | NativeWind 4.x (`className` prop). No inline `style` objects except for dynamic values Tailwind cannot express. |
-| **UI Components** | gluestack-ui 2.x (Button, Input, Modal, Toast, BottomSheet). |
-| **Icons** | lucide-react-native. |
+| **UI Components** | Custom NativeWind primitives (ADR-008). 16 shared components in `src/components/`. |
+| **Icons** | lucide-react-native (installed). |
 | **UX Rule** | "One-Click Approval" philosophy. No manual chain-switching after initial delegation. |
 
 ## Naming Conventions

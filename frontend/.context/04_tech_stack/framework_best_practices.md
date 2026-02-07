@@ -29,10 +29,12 @@ Full dependency matrix in `../docs/architecture/tech-stack.md`.
 ```
 ErrorBoundary
 └── GestureHandlerRootView
-    └── GluestackUIProvider (theme)
-        └── QueryClientProvider
-            └── WagmiProvider + Reown AppKit
-                └── WebSocketProvider (WS lifecycle + cache sync)
+    └── QueryClientProvider
+        └── WagmiProvider + Reown AppKit          ← E-3
+            └── WebSocketProvider (WS lifecycle)   ← E-7
+                └── ToastProvider                  ← E-1
                     └── SafeAreaProvider
                         └── expo-router <Slot />
 ```
+
+> **ADR-008:** GluestackUIProvider was removed. Custom NativeWind primitives are used instead.

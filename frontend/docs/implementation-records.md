@@ -1,6 +1,6 @@
 # Flywheel Wallet — Implementation Records
 
-**Last Updated:** 2026-02-07
+**Last Updated:** 2026-02-08
 **Tracks:** [development-backlog.md](development-backlog.md)
 
 ---
@@ -10,8 +10,8 @@
 | Epic | Title | Status | Tasks Done | Tasks Total | Notes |
 |------|-------|--------|------------|-------------|-------|
 | E-0 | Project Bootstrap | **Complete** | 12/12 | 12 | ADR-008 replaced gluestack with custom primitives |
-| E-1 | Shared UI Components | Not started | 0/9 | 9 | |
-| E-2 | Core Infrastructure | Not started | 0/10 | 10 | |
+| E-1 | Shared UI Components | **Complete** | 9/9 | 9 | Brand palette migrated, 16 components + 19 test files |
+| E-2 | Core Infrastructure | **Complete** | 10/10 | 10 | Types, API client, stores, hooks, EIP-712, chains |
 | E-3 | Wallet Connection | Not started | 0/5 | 5 | |
 | E-4 | EIP-712 Delegation | Not started | 0/7 | 7 | |
 | E-5 | Onboarding Flow | Not started | 0/6 | 6 | |
@@ -21,7 +21,7 @@
 | E-9 | Send (Gasless P2P + Cross-Chain) | Not started | 0/7 | 7 | |
 | E-10 | Withdrawal / Fast Exit | Not started | 0/6 | 6 | |
 | E-11 | Testing, Accessibility & Polish | Not started | 0/5 | 5 | |
-| **Total** | | | **12/86** | **86** | **14% complete** |
+| **Total** | | | **31/86** | **86** | **36% complete** |
 
 ---
 
@@ -51,7 +51,7 @@
 | ID | Task | Status | Implementation Notes |
 |----|------|--------|---------------------|
 | E-0-S2-T1 | Install NativeWind 4.x + TailwindCSS 3.4 | Done | NativeWind 4.1.23, TailwindCSS 3.4.19. `babel.config.js` with NativeWind presets (disabled in test env to avoid reanimated/worklets issues). `metro.config.js` with `withNativeWind` wrapper. `global.css` with Tailwind directives. Note: `lightningcss` override was planned but not needed — `package.json` overrides object is empty. |
-| E-0-S2-T2 | Add brand tokens to `tailwind.config.js` | Done | Colors: `brand-primary` (#6366F1), `brand-secondary` (#8B5CF6), `brand-success` (#22C55E), `brand-warning` (#F59E0B), `brand-error` (#EF4444), `brand-bg` (#0F172A), `brand-card` (#1E293B), `brand-text` (#F8FAFC), `brand-muted` (#94A3B8). Fonts: `mono` (JetBrainsMono), `sans` (Inter). |
+| E-0-S2-T2 | Add brand tokens to `tailwind.config.js` | Done | Colors: `brand-primary` (#6366F1), `brand-secondary` (#8B5CF6), `brand-success` (#22C55E), `brand-warning` (#F59E0B), `brand-error` (#EF4444), `brand-bg` (#0F172A), `brand-card` (#1E293B), `brand-text` (#F8FAFC), `brand-muted` (#94A3B8). Fonts: `mono` (JetBrainsMono), `sans` (Inter). **Updated in E-1:** migrated to official Flywheel brand palette (Electric Teal #00D4AA, Deep Space #0A1628, Warm Gold #FFB547, etc.). Added `brand-gold` and `brand-info` tokens. |
 | E-0-S2-T3 | Load custom fonts via `expo-font` | Done | Installed `@expo-google-fonts/inter` (4 weights: Regular, Medium, SemiBold, Bold) and `@expo-google-fonts/jetbrains-mono` (3 weights: Regular, Medium, Bold). Loaded in `app/_layout.tsx` via `useFonts()` hook. Splash screen held until fonts ready. |
 | E-0-S2-T4 | ~~gluestack-ui~~ → UI placeholder + Button pattern | Done | **ADR-008:** Decided against gluestack-ui. Created `src/components/ui/Button.tsx` as NativeWind reference pattern with 3 variants (primary, secondary, ghost). Created full `src/components/` directory structure for E-1. |
 
@@ -208,12 +208,339 @@ Files created or modified during E-0 bootstrap:
 
 ---
 
-## Next Up: E-1 — Shared UI Components
+## E-1 — Shared UI Components
 
-Unblocked. Dependencies satisfied by E-0-S2-T1 (NativeWind configured).
+**Status:** Complete
+**Date completed:** 2026-02-07
+**Branch:** `feat/ui-shared-components`
+
+### E-1-S0: Brand Color Migration + Dependencies
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-1-S0-T1 | Migrate brand colors to Flywheel palette | Done | Replaced placeholder Indigo/Violet/Slate with official Electric Teal (#00D4AA), Deep Space (#0A1628), Warm Gold (#FFB547). Updated `tailwind.config.js`, `app.json`, `app/(tabs)/_layout.tsx`, `coding-standards.md`. Added `brand-gold` and `brand-info` tokens. |
+| E-1-S0-T2 | Fix primary button contrast | Done | Changed primary button text from `text-white` to `text-brand-bg` (Deep Space) for WCAG contrast compliance on Electric Teal background. |
+| E-1-S0-T3 | Install dependencies | Done | Added `lucide-react-native` ^0.563.0, `react-native-svg` 15.8.0, `expo-clipboard` ~7.0.1. |
+| E-1-S0-T4 | Create utility pre-requisites | Done | `src/types/common.ts` (branded types `Uint256String`, `EthereumAddress` with validators), `src/lib/format.ts` (`formatBalance` using BigInt division — no floating-point, `truncateAddress`), `src/lib/errors.ts` (error code → user-facing message mapping), `src/lib/validation.ts` (Zod schemas). |
+| E-1-S0-T5 | Configure Jest test infrastructure | Done | Added `src/test/setup.ts` with mocks for `react-native-reanimated`, `expo-clipboard`, `expo-haptics`, `lucide-react-native`, `react-native-gesture-handler`. Updated `jest.config.js` with `setupFiles` and extended `transformIgnorePatterns`. |
+
+### E-1-S1: Layout & Navigation Components
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-1-S1-T1 | `ScreenContainer` | Done | `SafeAreaView` + optional `ScrollView` + `bg-brand-bg flex-1` + optional `px-4 pt-4`. |
+| E-1-S1-T2 | `AddressDisplay` | Done | Truncates `0x1234...5678` (6+4). Copy via `expo-clipboard` + haptic feedback. `font-mono text-brand-muted`. |
+| E-1-S1-T3 | `Header` | Done | Fixed bar with `AddressDisplay` pill, optional back arrow (lucide `ChevronLeft` + `router.back()`), connection dot, right action slot. |
+| E-1-S1-T4 | `BottomSheet` | Done | Custom implementation using `react-native-reanimated` + `Modal`. Slide animation, dark backdrop with dismiss on press. Title bar with handle. |
+
+### E-1-S2: Data Display Components
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-1-S2-T1 | `LoadingSkeleton` | Done | Pulsing opacity animation (0.3→0.7, 1s loop). `bg-brand-card`. Three variants: `text`, `card`, `circle`. Uses `DimensionValue` for type-safe sizing. |
+| E-1-S2-T2 | `AmountDisplay` | Done | Uses `formatBalance()` from `src/lib/format.ts`. `font-mono`. Size maps: sm→text-sm, md→text-lg, lg→text-2xl, xl→text-4xl. |
+| E-1-S2-T3 | `TokenRow` | Done | Row with first-letter circle icon, asset name, optional chain badge, `AmountDisplay` right-aligned. `Pressable` when onPress provided. Selection border via `border-brand-primary`. |
+| E-1-S2-T4 | `YieldBadge` | Done | `bg-brand-success/20`, `text-brand-success`. Shows `↑ {amount} {asset}`. Gentle pulse animation. `TrendingUp` icon from lucide. Returns null when no yield. |
+| E-1-S2-T5 | `ConnectionIndicator` | Done | 8px colored dot. connected=`bg-brand-success`, disconnected=`bg-brand-error`, reconnecting=`bg-brand-warning` + pulse animation. Accessibility labels. |
+
+### E-1-S3: Feedback & Form Components
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-1-S3-T1 | `Toast` + `ToastContext` | Done | Slide-in from top (reanimated). Color-coded left border per type (success/error/info). Auto-dismiss with configurable duration. `useToast()` hook for imperative usage. Follows "Reassure → Explain → Resolve" pattern. |
+| E-1-S3-T2 | `StepIndicator` | Done | Horizontal circles + connecting lines. Completed=checkmark (lucide `Check`) + success color, current=`bg-brand-primary`, future=`bg-brand-muted/30`. Labels below each step. |
+| E-1-S3-T3 | `TransactionProgress` | Done | Vertical stepper. Lucide icons per status (Check/AlertTriangle/Loader). Vertical connecting line colored by completion. Optional txHash truncated + copyable via `AddressDisplay`. |
+| E-1-S3-T4 | `ErrorState` | Done | Uses `getErrorMessage(code)` from `src/lib/errors.ts`. Inline=compact card with AlertTriangle, fullscreen=centered with large icon. Retry button uses existing `Button` component. |
+| E-1-S3-T5 | `AmountInput` | Done | `TextInput` with `keyboardType="decimal-pad"`. MAX button fills maxAmount. Numeric-only regex filtering. Decimal precision enforcement based on token decimals. Error text below input. Controlled component (no RHF — deferred to E-9). |
+| E-1-S3-T6 | `RecipientInput` | Done | Address `TextInput` with paste button (lucide `ClipboardPaste`). Reads clipboard via `expo-clipboard`. Validates `isValidEthereumAddress` on blur. `font-mono`. Controlled component. |
+| E-1-S3-T7 | `ChainSelector` | Done | Button showing selected chain + `ChevronDown`. Opens `BottomSheet` with chain list. Default chains: Sepolia + Base Sepolia. Selection closes sheet + calls onChange. |
+
+**Acceptance Criteria:**
+- [x] `pnpm run typecheck` — zero errors
+- [x] `pnpm run lint` — zero errors (6 warnings: `require()` in Jest mocks, expected)
+- [x] `pnpm run test` — 96/96 tests pass (21 suites)
+- [x] All 16 components created with tests
+- [x] Brand colors match official Flywheel palette
+- [x] Utilities (`format.ts`, `errors.ts`, `common.ts`, `validation.ts`) in final file locations
+
+---
+
+## Implementation Notes & Gotchas (E-1)
+
+### Lucide mock in Jest
+- `lucide-react-native` icons are React Native `View` class components, not functions. The mock must use `React.createElement(View, ...)` instead of calling `View(props)` directly, or you get "Cannot call a class as a function" errors.
+
+### Animated.View accessibility
+- `getByRole('alert')` and similar queries don't traverse `Animated.View` wrappers from `react-native-reanimated` in testing. Use `getByText` or `getByLabelText` instead.
+
+### Button contrast on Electric Teal
+- White text on `#00D4AA` (Electric Teal) has a contrast ratio of ~3:1 (fails WCAG AA). Primary buttons use `text-brand-bg` (#0A1628 Deep Space) for a contrast ratio of ~9.5:1.
+
+### BigInt in Hermes
+- Expo SDK 52 + React Native 0.76 Hermes engine supports `BigInt` natively. `formatBalance()` uses `BigInt` division for financial precision — no floating-point involved.
+
+---
+
+## Verification Checklist (E-1)
+
+- [x] `pnpm install` succeeds (new deps: lucide-react-native, react-native-svg, expo-clipboard)
+- [x] `pnpm run typecheck` — zero errors
+- [x] `pnpm run lint` — zero errors
+- [x] `pnpm run test` — 96/96 tests pass (21 suites, up from 3/3 in E-0)
+- [x] Brand colors match `docs/flywheel-brand-strategy.md`
+- [x] `app.json` backgroundColor uses Deep Space (#0A1628)
+- [x] Tab bar uses Electric Teal (#00D4AA) active tint
+- [ ] `npx expo start --web` visual verification (pending)
+- [ ] `npx expo start --ios` visual verification on iOS simulator (pending)
+
+---
+
+## File Manifest (E-1)
+
+### Files modified (5)
+| File | Changes |
+|------|---------|
+| `tailwind.config.js` | Brand colors migrated, added `gold` + `info` tokens |
+| `app/(tabs)/_layout.tsx` | 4 hardcoded hex values updated |
+| `app.json` | 3 `backgroundColor` occurrences updated |
+| `docs/architecture/coding-standards.md` | Color table updated |
+| `jest.config.js` | `setupFiles` + extended `transformIgnorePatterns` |
+
+### Utility files (4)
+| File | Purpose |
+|------|---------|
+| `src/types/common.ts` | Branded types `Uint256String`, `EthereumAddress` with validators |
+| `src/lib/format.ts` | `formatBalance()` (BigInt), `truncateAddress()` |
+| `src/lib/errors.ts` | Error code → user-facing message mapping |
+| `src/lib/validation.ts` | Zod schemas: `ethereumAddressSchema`, `uint256StringSchema`, `chainIdSchema` |
+
+### Test infrastructure (1)
+| File | Purpose |
+|------|---------|
+| `src/test/setup.ts` | Jest mocks for reanimated, expo-clipboard, expo-haptics, lucide, gesture-handler |
+
+### Components (16)
+| File | Category |
+|------|----------|
+| `src/components/shared/ScreenContainer.tsx` | Layout |
+| `src/components/shared/AddressDisplay.tsx` | Layout |
+| `src/components/shared/Header.tsx` | Layout |
+| `src/components/ui/BottomSheet.tsx` | Layout |
+| `src/components/shared/LoadingSkeleton.tsx` | Data Display |
+| `src/components/shared/AmountDisplay.tsx` | Data Display |
+| `src/components/shared/TokenRow.tsx` | Data Display |
+| `src/components/wallet/YieldBadge.tsx` | Data Display |
+| `src/components/wallet/ConnectionIndicator.tsx` | Data Display |
+| `src/components/ui/Toast.tsx` | Feedback |
+| `src/components/ui/ToastContext.tsx` | Feedback |
+| `src/components/shared/StepIndicator.tsx` | Feedback |
+| `src/components/shared/TransactionProgress.tsx` | Feedback |
+| `src/components/shared/ErrorState.tsx` | Feedback |
+| `src/components/shared/AmountInput.tsx` | Form |
+| `src/components/shared/RecipientInput.tsx` | Form |
+| `src/components/shared/ChainSelector.tsx` | Form |
+
+### Component button update (1)
+| File | Changes |
+|------|---------|
+| `src/components/ui/Button.tsx` | Primary text changed to `text-brand-bg` for contrast |
+
+### Tests (19)
+| File | Tests |
+|------|-------|
+| `src/types/__tests__/common.test.ts` | 10 |
+| `src/lib/__tests__/format.test.ts` | 10 |
+| `src/lib/__tests__/errors.test.ts` | 6 |
+| `src/components/shared/__tests__/ScreenContainer.test.tsx` | 3 |
+| `src/components/shared/__tests__/AddressDisplay.test.tsx` | 4 |
+| `src/components/shared/__tests__/Header.test.tsx` | 5 |
+| `src/components/ui/__tests__/BottomSheet.test.tsx` | 4 |
+| `src/components/shared/__tests__/LoadingSkeleton.test.tsx` | 4 |
+| `src/components/shared/__tests__/AmountDisplay.test.tsx` | 5 |
+| `src/components/shared/__tests__/TokenRow.test.tsx` | 5 |
+| `src/components/wallet/__tests__/YieldBadge.test.tsx` | 3 |
+| `src/components/wallet/__tests__/ConnectionIndicator.test.tsx` | 3 |
+| `src/components/ui/__tests__/Toast.test.tsx` | 5 |
+| `src/components/shared/__tests__/StepIndicator.test.tsx` | 3 |
+| `src/components/shared/__tests__/TransactionProgress.test.tsx` | 4 |
+| `src/components/shared/__tests__/ErrorState.test.tsx` | 5 |
+| `src/components/shared/__tests__/AmountInput.test.tsx` | 7 |
+| `src/components/shared/__tests__/RecipientInput.test.tsx` | 5 |
+| `src/components/shared/__tests__/ChainSelector.test.tsx` | 3 |
+
+---
+
+## E-2 — Core Infrastructure
+
+**Status:** Complete
+**Date completed:** 2026-02-08
+**Branch:** `feat/ui-shared-components`
+
+### E-2-S1: TypeScript Types & Format Utilities
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S1-T1 | API response types | Done | 7 type files: `api.ts`, `delegation.ts`, `balance.ts`, `withdrawal.ts`, `state.ts`, `health.ts`, `websocket.ts`. All match API spec exactly. |
+| E-2-S1-T2 | `parseAmount()` in format.ts | Done | BigInt-only conversion from display string to `Uint256String`. Validates format, decimal precision. Inverse of `formatBalance()`. |
+| E-2-S1-T3 | Expand errors.ts | Done | Added 16 error codes from API spec (total 22). Exported `ErrorMessage` interface. Covers all backend error codes. |
+
+### E-2-S2: API Client & Validation
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S2-T1 | Typed HTTP client | Done | `src/lib/api/client.ts` — Native `fetch` wrapper. Auto `Content-Type`, `X-Request-Id` via `crypto.randomUUID()`. `ApiClientError` class with `code`, `status`, `details`. 429 handling with `Retry-After`. |
+| E-2-S2-T2 | `hexStringSchema` | Done | Added to `src/lib/validation.ts`. Regex: `^0x[a-fA-F0-9]*$`. |
+| E-2-S2-T3 | API endpoint functions | Done | 5 modules: `health.ts`, `delegation.ts`, `balance.ts`, `withdrawal.ts`, `state.ts`. Barrel file at `index.ts`. 9 typed functions total. |
+
+### E-2-S3: Stores, Hooks, EIP-712 & Chains
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S3-T1 | Zustand stores | Done | 4 stores: `walletStore` (ephemeral), `delegationStore` (SecureStore persist, `skipHydration`), `onboardingStore` (AsyncStorage persist, `skipHydration`), `webSocketStore` (ephemeral). 2 persistence adapters: `secureStoreAdapter.ts`, `asyncStorageAdapter.ts`. |
+| E-2-S3-T2 | TanStack Query hooks | Done | 6 hooks: `useHealth`, `useBalance`, `useDelegation` (query + 2 mutations), `useWithdrawalRequest` + `useWithdrawalStatus` (polling), `useSessions`, `useChannel`. Shared `queryClient` extracted to `src/lib/queryClient.ts`. |
+| E-2-S3-T3 | EIP-712 delegation builder | Done | `src/lib/eip712/delegation.ts` — `buildDelegationTypedData()` using `EIP712AuthTypes` from `@erc7824/nitrolite`. Matches backend verification pattern. |
+| E-2-S3-T4 | Chain definitions | Done | `src/config/chains.ts` — Testnet (Sepolia + Base Sepolia) and Mainnet (Ethereum + Arbitrum One). Switches on `EXPO_PUBLIC_CHAIN_ENV`. Plain config objects (viem `Chain` types deferred to E-3). |
+
+### E-2-S4: Test Infrastructure & MSW
+
+| ID | Task | Status | Implementation Notes |
+|----|------|--------|---------------------|
+| E-2-S4-T1 | Expand MSW handlers | Done | 9 endpoint handlers with test data factories. |
+| E-2-S4-T2 | Test mocks for new deps | Done | Mocks for `expo-secure-store`, `@react-native-async-storage/async-storage`, `@erc7824/nitrolite` in `setup.ts`. |
+
+**Acceptance Criteria:**
+- [x] `pnpm run typecheck` — zero errors
+- [x] `pnpm run lint` — zero errors (6 warnings: `require()` in Jest mocks, pre-existing)
+- [x] `pnpm run test` — 212/212 tests pass (37 suites)
+- [x] Dependencies added: zustand, expo-secure-store, @react-native-async-storage/async-storage, @erc7824/nitrolite
+
+---
+
+## Implementation Notes & Gotchas (E-2)
+
+### Zustand persist with async storage
+- `expo-secure-store` and `@react-native-async-storage/async-storage` are async APIs. Zustand `persist` middleware requires `skipHydration: true` for async storage — call `useStore.persist.rehydrate()` at app startup (will be wired in E-5 onboarding flow).
+
+### ESLint no-non-null-assertion
+- Query hooks use `enabled: !!param` to guard `queryFn`. Since `queryFn` only runs when enabled, the param is guaranteed non-null at runtime. Used `as string` cast instead of `!` to satisfy ESLint's `no-non-null-assertion` rule.
+
+### ApiClientError for 429
+- Rate-limited responses (429) extract `Retry-After` header and include it as `details.retryAfter` (number). UI can use this to display countdown before retry.
+
+---
+
+## Verification Checklist (E-2)
+
+- [x] `pnpm install` succeeds (new deps: zustand, expo-secure-store, async-storage, @erc7824/nitrolite)
+- [x] `pnpm run typecheck` — zero errors
+- [x] `pnpm run lint` — zero errors
+- [x] `pnpm run test` — 212/212 tests pass (37 suites, up from 96/96 in E-1)
+- [x] All 7 type files match API specification
+- [x] API client handles success, error, and 429 responses
+- [x] 4 Zustand stores with appropriate persistence
+- [x] 6 TanStack Query hooks with proper `enabled` guards
+- [x] EIP-712 builder matches backend verification pattern
+- [x] Chain config switches on `EXPO_PUBLIC_CHAIN_ENV`
+
+---
+
+## File Manifest (E-2)
+
+### New files (~30)
+
+#### Type definitions (7)
+| File | Purpose |
+|------|---------|
+| `src/types/api.ts` | Shared API error envelope types |
+| `src/types/delegation.ts` | Delegation domain types (SessionKeyInfo, requests/responses) |
+| `src/types/balance.ts` | Balance domain types (BalanceEntry, response) |
+| `src/types/withdrawal.ts` | Withdrawal domain types (WithdrawalInfo, requests/responses) |
+| `src/types/state.ts` | State channel types (SessionInfo, LatestTransaction) |
+| `src/types/health.ts` | Health check response type |
+| `src/types/websocket.ts` | WebSocket message types (WsServerMessage union) |
+
+#### API client (7)
+| File | Purpose |
+|------|---------|
+| `src/lib/api/client.ts` | Typed HTTP client (apiGet, apiPost, ApiClientError) |
+| `src/lib/api/health.ts` | Health endpoint function |
+| `src/lib/api/delegation.ts` | Delegation endpoint functions (register, revoke, getKeys) |
+| `src/lib/api/balance.ts` | Balance endpoint function |
+| `src/lib/api/withdrawal.ts` | Withdrawal endpoint functions (request, getStatus) |
+| `src/lib/api/state.ts` | State endpoint functions (getChannel, getSessions) |
+| `src/lib/api/index.ts` | Barrel re-export |
+
+#### Stores (6)
+| File | Purpose |
+|------|---------|
+| `src/stores/lib/secureStoreAdapter.ts` | expo-secure-store Zustand StateStorage adapter |
+| `src/stores/lib/asyncStorageAdapter.ts` | AsyncStorage Zustand StateStorage adapter |
+| `src/stores/walletStore.ts` | Wallet connection state (ephemeral) |
+| `src/stores/delegationStore.ts` | Delegation state (SecureStore persisted) |
+| `src/stores/onboardingStore.ts` | Onboarding progress (AsyncStorage persisted) |
+| `src/stores/webSocketStore.ts` | WebSocket connection state (ephemeral) |
+
+#### Hooks (6)
+| File | Purpose |
+|------|---------|
+| `src/hooks/useHealth.ts` | Health query hook |
+| `src/hooks/useBalance.ts` | Balance query hook |
+| `src/hooks/useDelegation.ts` | Delegation query + mutations hook |
+| `src/hooks/useWithdrawal.ts` | Withdrawal mutation + polling hook |
+| `src/hooks/useSessions.ts` | Sessions query hook |
+| `src/hooks/useChannel.ts` | Channel query hook |
+
+#### Config & utilities (3)
+| File | Purpose |
+|------|---------|
+| `src/lib/queryClient.ts` | Shared QueryClient instance |
+| `src/lib/eip712/delegation.ts` | EIP-712 delegation typed-data builder |
+| `src/config/chains.ts` | Chain definitions (testnet/mainnet) |
+
+### Modified files (7)
+| File | Changes |
+|------|---------|
+| `package.json` | Added zustand, expo-secure-store, async-storage, @erc7824/nitrolite |
+| `src/lib/format.ts` | Added `parseAmount()` |
+| `src/lib/errors.ts` | Added 16 error codes, exported `ErrorMessage` interface |
+| `src/lib/validation.ts` | Added `hexStringSchema` |
+| `src/providers/AppProviders.tsx` | Import queryClient from `src/lib/queryClient.ts` |
+| `src/test/msw/handlers.ts` | Full API handlers + test data factories |
+| `src/test/setup.ts` | Mocks for secure-store, async-storage, nitrolite |
+| `jest.config.js` | Added new packages to transformIgnorePatterns |
+
+### New test files (16)
+| File | Tests |
+|------|-------|
+| `src/types/__tests__/api-types.test.ts` | 20 |
+| `src/lib/__tests__/format.test.ts` | 20 (was 10, +10 for parseAmount) |
+| `src/lib/__tests__/errors.test.ts` | 24 (was 6, +18 for new codes) |
+| `src/lib/__tests__/validation.test.ts` | 12 |
+| `src/lib/api/__tests__/client.test.ts` | 8 |
+| `src/lib/api/__tests__/endpoints.test.ts` | 11 |
+| `src/stores/__tests__/walletStore.test.ts` | 3 |
+| `src/stores/__tests__/delegationStore.test.ts` | 6 |
+| `src/stores/__tests__/onboardingStore.test.ts` | 4 |
+| `src/stores/__tests__/webSocketStore.test.ts` | 3 |
+| `src/hooks/__tests__/useHealth.test.ts` | 1 |
+| `src/hooks/__tests__/useBalance.test.ts` | 2 |
+| `src/hooks/__tests__/useDelegation.test.ts` | 3 |
+| `src/hooks/__tests__/useWithdrawal.test.ts` | 3 |
+| `src/hooks/__tests__/useSessions.test.ts` | 2 |
+| `src/hooks/__tests__/useChannel.test.ts` | 2 |
+| `src/lib/eip712/__tests__/delegation.test.ts` | 5 |
+| `src/config/__tests__/chains.test.ts` | 4 |
+
+---
+
+## Next Up: E-3 — Wallet Connection
+
+Unblocked by E-2. Dependencies to install: `wagmi`, `viem`, `@reown/appkit`.
 
 | Story | Key Deliverables |
 |-------|-----------------|
-| E-1-S1 | `ScreenContainer`, `Header`, `BottomSheet` |
-| E-1-S2 | `AmountDisplay`, `AddressDisplay`, `TokenRow`, `LoadingSkeleton`, `YieldBadge`, `ConnectionIndicator` |
-| E-1-S3 | `Toast`, `StepIndicator`, `TransactionProgress`, `ErrorState`, `AmountInput`, `RecipientInput`, `ChainSelector` |
+| E-3-S1 | Install wagmi, viem, @reown/appkit |
+| E-3-S2 | Configure WagmiProvider with supported chains |
+| E-3-S3 | Create ConnectWalletButton component |
+| E-3-S4 | Wire wallet connection to walletStore |
+| E-3-S5 | Add WalletConnect modal integration |

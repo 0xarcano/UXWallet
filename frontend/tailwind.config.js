@@ -6,15 +6,17 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          primary: '#6366F1',
-          secondary: '#8B5CF6',
-          success: '#22C55E',
-          warning: '#F59E0B',
-          error: '#EF4444',
-          bg: '#0F172A',
-          card: '#1E293B',
-          text: '#F8FAFC',
-          muted: '#94A3B8',
+          primary: '#00D4AA',
+          secondary: '#7C6FF0',
+          success: '#34D399',
+          warning: '#FBBF24',
+          error: '#F87171',
+          bg: '#0A1628',
+          card: '#1A2742',
+          text: '#F8FAFB',
+          muted: '#8892A0',
+          gold: '#FFB547',
+          info: '#60A5FA',
         },
       },
       fontFamily: {
