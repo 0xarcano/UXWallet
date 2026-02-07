@@ -11,6 +11,7 @@ This folder contains the on-chain MVP for:
 
 - `src/flywheel/FlywheelProtocol.sol`
   - Protocol facade that coordinates deposit, session-key registration, solver fills, Nitro calls, and treasury actions.
+  - Holds pending user reward balances and auto-pays them on withdraw.
   - Intended on-chain entrypoint for app/backend.
 - `src/onboard/SessionKeyRegistry.sol`
   - Session key registration, nonce replay protection, expiry.
@@ -67,28 +68,30 @@ On-chain calls:
    - per-spend cap from `SessionKeyRegistry`.
 4. Optional LI.FI path:
    - `LifiAdapter.submit(lifiCalldata)` if configured in settler order data.
-5. Treasury credit via protocol:
-   - `FlywheelProtocol.creditTreasury(asset, amount)` ->
-   - `TreasuryVault.creditTreasury(asset, amount)`.
+5. Reward registration + split via protocol:
+   - `FlywheelProtocol.registerRewards(user, asset, totalReward)`.
+   - Splits `totalReward` as 50% pending user rewards and 50% treasury credit.
+   - Treasury side is forwarded to `TreasuryVault.creditTreasury(asset, treasuryShare)`.
 6. Nitro settlement via protocol:
    - `FlywheelProtocol.settleViaAdjudicator(calldata)`.
    - `FlywheelProtocol.settleViaCustody(calldata)`.
 
 Current MVP note:
 
-- Reward/credit split accounting (50% user / 50% treasury) is currently off-chain.
-- Treasury custody and withdrawal controls are on-chain.
+- Reward split and pending user rewards are on-chain in `FlywheelProtocol`.
+- Treasury custody and withdrawal controls are on-chain in `TreasuryVault`.
 
 ### 3) User Withdrawal + Distribution
 
 On-chain calls:
 
-1. User withdraws principal:
-   - `FlywheelProtocol.withdrawPrincipal(asset, amount, recipient)` ->
-   - `LPVault.withdrawFor(user, asset, amount, recipient)`.
+1. User withdraws principal and rewards in one call:
+   - `FlywheelProtocol.withdraw(asset, amount, recipient)` ->
+   - `LPVault.withdrawFor(user, asset, amount, recipient)` for principal.
+   - Pending rewards for `user,asset` are transferred automatically in the same tx.
 2. Emergency withdraw:
    - `FlywheelProtocol.emergencyWithdrawAll(asset, recipient)` ->
-   - `LPVault.withdrawFor(user, asset, fullBalance, recipient)`.
+   - pulls full principal and also auto-pays any pending rewards.
 3. Treasury operator withdraws treasury funds:
    - `FlywheelProtocol.withdrawTreasury(asset, amount, to)` ->
    - `TreasuryVault.withdrawTreasury(asset, amount, to)`.
@@ -127,7 +130,7 @@ Coverage:
 2. Solver fill via protocol facade and settler cap enforcement.
 3. Treasury credit via protocol facade.
 4. Nitro adapter calls via protocol facade.
-5. User principal withdrawal and treasury withdrawal via protocol facade.
+5. User withdraw (principal + auto rewards) and treasury withdrawal via protocol facade.
 
 Run:
 
@@ -141,6 +144,7 @@ forge test --match-contract FlywheelWorkflowTest --offline
 
 - `script/SessionKeyRegistry.s.sol`: deploy registry.
 - `script/DeployMockERC20.s.sol`: deploy + mint mock token.
+- `script/DeployFlywheelProtocol.s.sol`: deploy and wire full Flywheel stack.
 
 Deploy examples:
 
@@ -148,6 +152,17 @@ Deploy examples:
 source .env
 forge script script/SessionKeyRegistry.s.sol:SessionKeyRegistryScript --rpc-url "$RPC_URL" --broadcast
 forge script script/DeployMockERC20.s.sol:DeployMockERC20Script --rpc-url "$RPC_URL" --broadcast
+forge script script/DeployFlywheelProtocol.s.sol:DeployFlywheelProtocolScript --rpc-url "$RPC_URL" --broadcast
+```
+
+One-command full stack deploy with only admin input:
+
+```bash
+forge script script/DeployFlywheelProtocol.s.sol:DeployFlywheelProtocolScript \
+  --sig "run(address)" 0xYourAdminAddress \
+  --rpc-url "$RPC_URL" \
+  --private-key "$PRIVATE_KEY" \
+  --broadcast
 ```
 
 ## .env Example
@@ -156,6 +171,11 @@ forge script script/DeployMockERC20.s.sol:DeployMockERC20Script --rpc-url "$RPC_
 PRIVATE_KEY=0x...
 RPC_URL=https://...
 ETHERSCAN_API_KEY=...
+PROTOCOL_ADMIN=0x... # optional for run(); defaults to deployer
+ADJUDICATOR_ADDRESS=0x... # optional for run(); mocks if unset
+CUSTODY_ADDRESS=0x... # optional for run(); mocks if unset
+SOLVER_ADDRESS=0x... # optional for run()
+TREASURY_OPERATOR_ADDRESS=0x... # optional for run()
 
 TOKEN_NAME="Mock USDC"
 TOKEN_SYMBOL=mUSDC

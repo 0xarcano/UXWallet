@@ -27,6 +27,7 @@ contract FlywheelProtocol is AccessControl {
     LPVault public immutable lpVault;
     TreasuryVault public immutable treasuryVault;
     NitroSettlementAdapter public immutable nitroSettlementAdapter;
+    mapping(address user => mapping(address asset => uint256 amount)) public pendingRewards;
 
     event SolverRoleUpdated(address indexed solver, bool enabled);
     event TreasuryOperatorUpdated(address indexed operator, bool enabled);
@@ -35,7 +36,16 @@ contract FlywheelProtocol is AccessControl {
     event SessionKeyRevoked(address indexed user, address indexed sessionKey);
     event IntentFulfilled(bytes32 indexed intentId, address indexed solver, address indexed user);
     event TreasuryCredited(address indexed operator, address indexed asset, uint256 amount);
+    event RewardsRegistered(
+        address indexed operator,
+        address indexed user,
+        address indexed asset,
+        uint256 totalReward,
+        uint256 userShare,
+        uint256 treasuryShare
+    );
     event PrincipalWithdrawn(address indexed user, address indexed asset, uint256 amount, address indexed recipient);
+    event RewardWithdrawn(address indexed user, address indexed asset, uint256 amount, address indexed recipient);
     event EmergencyWithdrawn(address indexed user, address indexed asset, uint256 amount, address indexed recipient);
     event TreasuryWithdrawn(address indexed operator, address indexed asset, uint256 amount, address indexed to);
 
@@ -172,21 +182,58 @@ contract FlywheelProtocol is AccessControl {
         emit TreasuryCredited(msg.sender, asset, amount);
     }
 
-    /// @notice User withdraws their principal from LPVault.
-    /// @dev Withdraws principal only; rewards are tracked off-chain in database.
-    function withdrawPrincipal(address asset, uint256 amount, address recipient) external {
+    /// @notice Register intent-fulfillment reward and split it 50/50 (user and treasury).
+    /// @dev Pulls `totalReward` from operator and records user share for automatic payout on withdraw.
+    function registerRewards(address user, address asset, uint256 totalReward) external onlyRole(TREASURY_OPERATOR_ROLE) {
+        if (user == address(0) || asset == address(0)) revert InvalidAddress();
+        if (totalReward == 0) revert InvalidAmount();
+
+        uint256 userShare = totalReward / 2;
+        uint256 treasuryShare = totalReward - userShare;
+        IERC20 token = IERC20(asset);
+        token.safeTransferFrom(msg.sender, address(this), totalReward);
+
+        if (treasuryShare > 0) {
+            token.forceApprove(address(treasuryVault), treasuryShare);
+            treasuryVault.creditTreasury(asset, treasuryShare);
+            token.forceApprove(address(treasuryVault), 0);
+        }
+
+        if (userShare > 0) {
+            pendingRewards[user][asset] += userShare;
+        }
+
+        emit RewardsRegistered(msg.sender, user, asset, totalReward, userShare, treasuryShare);
+    }
+
+    /// @notice User withdraws principal and automatically receives any pending user rewards.
+    function withdraw(address asset, uint256 amount, address recipient) public {
         if (asset == address(0) || recipient == address(0)) revert InvalidAddress();
-        if (amount == 0) revert InvalidAmount();
-        lpVault.withdrawFor(msg.sender, asset, amount, recipient);
-        emit PrincipalWithdrawn(msg.sender, asset, amount, recipient);
+        uint256 reward = pendingRewards[msg.sender][asset];
+        if (amount == 0 && reward == 0) revert InvalidAmount();
+
+        if (amount > 0) {
+            lpVault.withdrawFor(msg.sender, asset, amount, recipient);
+            emit PrincipalWithdrawn(msg.sender, asset, amount, recipient);
+        }
+
+        if (reward > 0) {
+            pendingRewards[msg.sender][asset] = 0;
+            IERC20(asset).safeTransfer(recipient, reward);
+            emit RewardWithdrawn(msg.sender, asset, reward, recipient);
+        }
+    }
+
+    /// @notice Backward-compatible alias for `withdraw`.
+    function withdrawPrincipal(address asset, uint256 amount, address recipient) external {
+        withdraw(asset, amount, recipient);
     }
 
     /// @notice Emergency withdraw: pulls full principal balance for a user/asset.
     function emergencyWithdrawAll(address asset, address recipient) external {
         if (asset == address(0) || recipient == address(0)) revert InvalidAddress();
         uint256 amount = lpVault.principalOf(msg.sender, asset);
-        if (amount == 0) revert InvalidAmount();
-        lpVault.withdrawFor(msg.sender, asset, amount, recipient);
+        withdraw(asset, amount, recipient);
         emit EmergencyWithdrawn(msg.sender, asset, amount, recipient);
     }
 

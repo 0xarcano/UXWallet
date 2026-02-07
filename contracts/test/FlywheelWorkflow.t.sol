@@ -147,11 +147,12 @@ contract FlywheelWorkflowTest is Test {
 
     function _step2SettleTreasuryAndNitro(bytes32) internal {
         vm.prank(treasuryOperator);
-        token.approve(address(protocol), TREASURY_REWARD);
+        token.approve(address(protocol), REWARD_AMOUNT);
         vm.prank(treasuryOperator);
-        protocol.creditTreasury(address(token), TREASURY_REWARD);
+        protocol.registerRewards(user, address(token), REWARD_AMOUNT);
 
         assertEq(treasuryVault.treasuryBalance(address(token)), TREASURY_REWARD);
+        assertEq(protocol.pendingRewards(user, address(token)), USER_REWARD);
 
         bytes32 channelId = keccak256("channel-1");
         bytes32 stateHash = keccak256("final-state");
@@ -174,10 +175,11 @@ contract FlywheelWorkflowTest is Test {
     function _step3WithdrawAndDistribute() internal {
         uint256 userBalanceBefore = token.balanceOf(user);
         vm.prank(user);
-        protocol.withdrawPrincipal(address(token), PRINCIPAL_AMOUNT, user);
+        protocol.withdraw(address(token), PRINCIPAL_AMOUNT, user);
 
         assertEq(lpVault.principalOf(user, address(token)), 0);
-        assertEq(token.balanceOf(user), userBalanceBefore + PRINCIPAL_AMOUNT);
+        assertEq(token.balanceOf(user), userBalanceBefore + PRINCIPAL_AMOUNT + USER_REWARD);
+        assertEq(protocol.pendingRewards(user, address(token)), 0);
 
         uint256 treasuryRecipientBefore = token.balanceOf(treasuryRecipient);
         vm.prank(treasuryOperator);
