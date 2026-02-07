@@ -21,7 +21,7 @@
 | EIP-712 Types | @erc7824/nitrolite | latest | **Not yet installed** (E-4) |
 | Styling | NativeWind | 4.1.23 | Installed |
 | UI Primitives | Custom NativeWind components | — | ADR-008 (replaces gluestack-ui) |
-| Icons | lucide-react-native | latest | **Not yet installed** (E-1) |
+| Icons | lucide-react-native | ^0.563.0 | Installed (E-1) |
 | Animations | react-native-reanimated | 3.16.7 | Installed |
 | Secure Storage | expo-secure-store | ~52.x | **Not yet installed** (E-2) |
 | Async Storage | @react-native-async-storage/async-storage | 2.x | **Not yet installed** (E-2) |
@@ -77,7 +77,9 @@
 |---------|---------|-----------|---------|
 | `nativewind` | 4.1.23 | 4.1.23 | TailwindCSS for React Native (className prop) |
 | `tailwindcss` | ~3.4.19 | 3.4.19 | Utility-first CSS framework (config only) |
-| `lucide-react-native` | latest | **Not yet** (E-1) | Consistent icon set |
+| `lucide-react-native` | ^0.563.0 | 0.563.0 | Consistent icon set |
+| `react-native-svg` | 15.8.0 | 15.8.0 | SVG rendering (lucide dependency) |
+| `expo-clipboard` | ~7.0.1 | 7.0.1 | Clipboard access (AddressDisplay, RecipientInput) |
 | `react-native-reanimated` | ~3.16.1 | 3.16.7 | Layout animations, gesture transitions |
 | `react-native-gesture-handler` | ~2.20.2 | 2.20.2 | Touch gesture system |
 

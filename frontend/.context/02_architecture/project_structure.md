@@ -22,13 +22,13 @@ frontend/
 │   ├── withdraw/                 # Withdrawal sub-stack (US-04)
 │   └── unify/                    # Unification sub-stack (US-03)
 ├── src/
-│   ├── components/               # Reusable UI components
-│   │   ├── ui/                   # Base components (gluestack wrappers)
-│   │   ├── wallet/               # BalanceCard, ChainBreakdown, YieldBadge
-│   │   ├── delegation/           # DelegationModal, ScopeExplainer
-│   │   ├── send/                 # RecipientInput, AmountInput
-│   │   ├── withdraw/             # ExitTypeIndicator, WithdrawProgress
-│   │   └── shared/               # ScreenContainer, Header, AmountDisplay, etc.
+│   ├── components/               # Reusable UI components (16 shared, E-1 complete)
+│   │   ├── ui/                   # Base components: Button, BottomSheet, Toast, ToastContext
+│   │   ├── wallet/               # YieldBadge, ConnectionIndicator (+ BalanceCard, ChainBreakdown in E-6)
+│   │   ├── delegation/           # DelegationModal, ScopeExplainer (E-4)
+│   │   ├── send/                 # (E-9)
+│   │   ├── withdraw/             # ExitTypeIndicator, WithdrawProgress (E-10)
+│   │   └── shared/               # ScreenContainer, Header, AddressDisplay, AmountDisplay, TokenRow, LoadingSkeleton, StepIndicator, TransactionProgress, ErrorState, AmountInput, RecipientInput, ChainSelector
 │   ├── hooks/                    # Custom React hooks
 │   │   ├── useBalance.ts         # TanStack Query: GET /api/balance
 │   │   ├── useDelegation.ts      # TanStack Query: delegation CRUD
@@ -38,11 +38,12 @@ frontend/
 │   │   ├── useChannel.ts         # TanStack Query: GET /api/state/channel
 │   │   └── useHealth.ts          # TanStack Query: GET /api/health
 │   ├── lib/                      # Utilities and clients
-│   │   ├── api/                  # Typed HTTP client (client.ts, delegation.ts, balance.ts, etc.)
-│   │   ├── ws/                   # WebSocket client (connection, reconnect, subscribe)
-│   │   ├── eip712/               # EIP-712 delegation typed-data helpers
-│   │   ├── format.ts             # BigInt ↔ display string conversions
-│   │   └── errors.ts             # Error code → user message mapping
+│   │   ├── api/                  # Typed HTTP client (E-2)
+│   │   ├── ws/                   # WebSocket client (E-7)
+│   │   ├── eip712/               # EIP-712 delegation typed-data helpers (E-4)
+│   │   ├── format.ts             # BigInt formatBalance(), truncateAddress() (E-1)
+│   │   ├── errors.ts             # Error code → user message mapping (E-1)
+│   │   └── validation.ts         # Zod schemas: address, uint256, chainId (E-1)
 │   ├── stores/                   # Zustand stores
 │   │   ├── walletStore.ts        # Wallet connection state
 │   │   ├── delegationStore.ts    # Delegation status (active/expired/none)

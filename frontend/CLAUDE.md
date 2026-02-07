@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Project Status
 
-**E-0 (Project Bootstrap) complete** — Expo SDK 52 project scaffolded with routing, styling, providers, testing, and dev tooling. See `docs/implementation-records.md` for full status. Web version verified working. Many dependencies (Zustand, Wagmi, Reown, etc.) are planned but not yet installed — they will be added as their respective epics begin.
+**E-0 (Project Bootstrap) complete** — Expo SDK 52 project scaffolded with routing, styling, providers, testing, and dev tooling.
+
+**E-1 (Shared UI Components) complete** — 16 reusable components built with tests (96 tests, 21 suites). Brand colors migrated to official Flywheel palette. Utilities created: `format.ts`, `errors.ts`, `common.ts`, `validation.ts`. Dependencies added: `lucide-react-native`, `react-native-svg`, `expo-clipboard`.
+
+See `docs/implementation-records.md` for full status. Many dependencies (Zustand, Wagmi, Reown, etc.) are planned but not yet installed — they will be added as their respective epics begin.
 
 ## Context Files
 

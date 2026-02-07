@@ -37,42 +37,45 @@ ErrorBoundary
 
 ## Shared Reusable Components
 
+> **Status:** All 16 shared components implemented in E-1. See `docs/implementation-records.md` for details.
+
 ### Layout Components
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `ScreenContainer` | `children`, `scroll?`, `padding?` | SafeArea + scroll wrapper, consistent padding |
-| `Header` | `title?`, `showBack?`, `rightAction?` | Top bar with wallet address pill + connection indicator |
-| `BottomSheet` | `isOpen`, `onClose`, `children`, `snapPoints?` | Bottom sheet modal (delegation details, confirmations) |
+| Component | Location | Props | Description |
+|-----------|----------|-------|-------------|
+| `ScreenContainer` | `shared/` | `children`, `scroll?`, `padding?`, `className?` | SafeAreaView + optional ScrollView, `bg-brand-bg flex-1`, optional `px-4 pt-4` |
+| `Header` | `shared/` | `title?`, `showBack?`, `rightAction?`, `walletAddress?`, `connectionStatus?` | Top bar with AddressDisplay pill, back arrow (lucide ChevronLeft), connection dot, right action slot |
+| `BottomSheet` | `ui/` | `isOpen`, `onClose`, `children`, `snapPoints?`, `title?` | Custom modal using reanimated slide animation + dark backdrop. Handle bar + optional title. |
 
 ### Data Display Components
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `AmountDisplay` | `amount: string`, `asset: string`, `decimals: number`, `size?` | Formats uint256 string → human-readable with asset symbol. Uses JetBrains Mono. |
-| `AddressDisplay` | `address: string`, `truncate?`, `copyable?` | Truncated address (0x1234...5678) with copy-to-clipboard |
-| `YieldBadge` | `yieldPercent?: number` | Green badge showing yield percentage (e.g., "+2.4%") |
-| `TokenRow` | `asset: string`, `balance: string`, `chainId?: number`, `onPress?` | Asset icon + name + balance. Used in balance lists. |
-| `ChainBreakdown` | `balances: Balance[]` | Expandable list showing per-chain breakdown of a single asset |
-| `ConnectionIndicator` | `status: 'connected' \| 'disconnected' \| 'reconnecting'` | Dot indicator (green/red/yellow) for WebSocket status |
-| `LoadingSkeleton` | `width?`, `height?`, `variant?` | Animated placeholder for loading states |
+| Component | Location | Props | Description |
+|-----------|----------|-------|-------------|
+| `AmountDisplay` | `shared/` | `amount: string`, `asset: string`, `decimals: number`, `size?: 'sm'\|'md'\|'lg'\|'xl'`, `showSymbol?`, `className?` | Formats uint256 string via `formatBalance()` (BigInt). `font-mono`. Size maps to Tailwind text classes. |
+| `AddressDisplay` | `shared/` | `address: string`, `truncate?`, `copyable?`, `className?` | Truncated address (0x1234...5678, 6+4). Copy via `expo-clipboard` + haptic feedback. `font-mono text-brand-muted`. |
+| `YieldBadge` | `wallet/` | `yieldAmount?: string`, `asset?: string`, `className?` | `bg-brand-success/20` badge with `TrendingUp` icon. Shows `↑ {amount} {asset}`. Gentle pulse animation. Returns null when no yield. |
+| `TokenRow` | `shared/` | `asset`, `balance`, `decimals`, `chainName?`, `onPress?`, `selected?`, `className?` | Row with first-letter circle icon, name, chain badge, AmountDisplay right-aligned. Pressable when onPress provided. |
+| `ConnectionIndicator` | `wallet/` | `status: 'connected' \| 'disconnected' \| 'reconnecting'` | 8px dot: connected=green, disconnected=red, reconnecting=yellow+pulse. Accessibility labels. |
+| `LoadingSkeleton` | `shared/` | `width?`, `height?`, `variant?: 'text'\|'card'\|'circle'`, `className?` | Pulsing opacity animation (0.3→0.7). `bg-brand-card`. Variant controls shape/size defaults. |
+| `ChainBreakdown` | — | `balances: Balance[]` | **Not yet implemented** (E-6). Expandable per-chain breakdown. |
 
 ### Form Components
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `AmountInput` | `control` (RHF), `asset`, `maxAmount?`, `decimals` | Numeric input with MAX button, validates against uint256 |
-| `RecipientInput` | `control` (RHF), `onScan?` | Address input with paste + QR scan (future) |
-| `ChainSelector` | `selectedChainId`, `onChange`, `chains` | Dropdown/bottom sheet for chain selection |
+| Component | Location | Props | Description |
+|-----------|----------|-------|-------------|
+| `AmountInput` | `shared/` | `value`, `onChangeText`, `asset`, `decimals`, `maxAmount?`, `error?`, `label?` | Numeric-only `TextInput` with MAX button, decimal precision enforcement. Controlled component (RHF wrapper in E-9). |
+| `RecipientInput` | `shared/` | `value`, `onChangeText`, `error?`, `label?` | Address input with paste button (expo-clipboard). Validates `isValidEthereumAddress` on blur. `font-mono`. |
+| `ChainSelector` | `shared/` | `selectedChainId`, `onChange`, `chains?` | Button + ChevronDown opens BottomSheet with chain list. Defaults: Sepolia + Base Sepolia. |
 
 ### Feedback Components
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `Toast` | `type: 'success' \| 'error' \| 'info'`, `message`, `action?` | Non-blocking notification. Follows Reassure → Explain → Resolve pattern. |
-| `StepIndicator` | `steps: string[]`, `currentStep: number` | Horizontal step dots/labels for multi-step flows |
-| `TransactionProgress` | `status`, `steps: Step[]`, `txHash?` | Vertical progress tracker with animated transitions |
-| `ErrorState` | `code?`, `message`, `onRetry?` | Full-screen or inline error with retry button |
+| Component | Location | Props | Description |
+|-----------|----------|-------|-------------|
+| `Toast` | `ui/` | `type: 'success'\|'error'\|'info'`, `message`, `title?`, `action?`, `visible`, `onDismiss?` | Slide-in from top (reanimated). Color-coded left border. Follows Reassure → Explain → Resolve pattern. |
+| `ToastContext` | `ui/` | Provider + `useToast()` hook | `ToastProvider` wraps app. `useToast().showToast()` for imperative usage with auto-dismiss. |
+| `StepIndicator` | `shared/` | `steps: string[]`, `currentStep: number` | Horizontal circles + connecting lines. Completed=checkmark+success, current=primary, future=muted. Labels below. |
+| `TransactionProgress` | `shared/` | `steps: Array<{ label, description?, status }>`, `txHash?` | Vertical stepper with status icons (Check/AlertTriangle/Loader). Connecting line. Optional copyable txHash. |
+| `ErrorState` | `shared/` | `code?`, `message?`, `title?`, `onRetry?`, `inline?` | Maps error codes via `getErrorMessage()`. Inline=compact card, fullscreen=centered. Retry button. |
 
 ---
 
