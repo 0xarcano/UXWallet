@@ -86,7 +86,10 @@ On-chain calls:
 1. User withdraws principal:
    - `FlywheelProtocol.withdrawPrincipal(asset, amount, recipient)` ->
    - `LPVault.withdrawFor(user, asset, amount, recipient)`.
-2. Treasury operator withdraws treasury funds:
+2. Emergency withdraw:
+   - `FlywheelProtocol.emergencyWithdrawAll(asset, recipient)` ->
+   - `LPVault.withdrawFor(user, asset, fullBalance, recipient)`.
+3. Treasury operator withdraws treasury funds:
    - `FlywheelProtocol.withdrawTreasury(asset, amount, to)` ->
    - `TreasuryVault.withdrawTreasury(asset, amount, to)`.
 

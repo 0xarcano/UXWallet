@@ -32,9 +32,11 @@ contract FlywheelProtocol is AccessControl {
     event TreasuryOperatorUpdated(address indexed operator, bool enabled);
     event DelegatedToPool(address indexed user, address indexed asset, uint256 amount, address indexed receiver);
     event SessionKeyRegistered(address indexed user, address indexed sessionKey);
+    event SessionKeyRevoked(address indexed user, address indexed sessionKey);
     event IntentFulfilled(bytes32 indexed intentId, address indexed solver, address indexed user);
     event TreasuryCredited(address indexed operator, address indexed asset, uint256 amount);
     event PrincipalWithdrawn(address indexed user, address indexed asset, uint256 amount, address indexed recipient);
+    event EmergencyWithdrawn(address indexed user, address indexed asset, uint256 amount, address indexed recipient);
     event TreasuryWithdrawn(address indexed operator, address indexed asset, uint256 amount, address indexed to);
 
     error InvalidAddress();
@@ -112,6 +114,12 @@ contract FlywheelProtocol is AccessControl {
         emit SessionKeyRegistered(req.user, req.sessionKey);
     }
 
+    /// @notice Revoke a previously registered session key.
+    function revokeSessionKey(address sessionKey) external {
+        sessionKeyRegistry.revokeSessionKey(sessionKey);
+        emit SessionKeyRevoked(msg.sender, sessionKey);
+    }
+
     /// @notice Combined deposit and session key registration in one transaction.
     /// @dev Convenience function for onboarding: delegate assets and register session key atomically.
     function delegateAndRegister(
@@ -171,6 +179,15 @@ contract FlywheelProtocol is AccessControl {
         if (amount == 0) revert InvalidAmount();
         lpVault.withdrawFor(msg.sender, asset, amount, recipient);
         emit PrincipalWithdrawn(msg.sender, asset, amount, recipient);
+    }
+
+    /// @notice Emergency withdraw: pulls full principal balance for a user/asset.
+    function emergencyWithdrawAll(address asset, address recipient) external {
+        if (asset == address(0) || recipient == address(0)) revert InvalidAddress();
+        uint256 amount = lpVault.principalOf(msg.sender, asset);
+        if (amount == 0) revert InvalidAmount();
+        lpVault.withdrawFor(msg.sender, asset, amount, recipient);
+        emit EmergencyWithdrawn(msg.sender, asset, amount, recipient);
     }
 
     /// @notice Treasury operator withdraws treasury funds. Only treasury, never user funds.
