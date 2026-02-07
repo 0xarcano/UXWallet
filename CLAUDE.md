@@ -14,8 +14,8 @@ Four independent sub-projects sharing a git repo:
 
 | Sub-project | Stack | Purpose |
 |-------------|-------|---------|
-| `frontend/` | Next.js, React, TypeScript, TailwindCSS | Wallet UI |
-| `backend/` | Node.js, Express, Prisma, Viem, TypeScript | ClearNode, Solver, KMS |
+| `frontend/` | Expo SDK 52, React Native, TypeScript, NativeWind | Wallet mobile app (planning/docs phase — no code yet) |
+| `backend/` | Node.js, Fastify, Prisma, Viem, TypeScript | ClearNode, Solver, KMS |
 | `contracts/` | Solidity 0.8.33, Foundry | Custody & settlement smart contracts |
 | `lif-rust/` | Rust, Axum, Alloy, Tokio | LiFi integration microservice |
 
@@ -36,7 +36,7 @@ npm run db:migrate             # Run migrations
 npm run db:push                # Push schema directly to DB
 
 # Development
-npm run dev                    # tsx watch mode on port 3001
+npm run dev                    # tsx watch mode on port 3000
 
 # Build & Production
 npm run build                  # tsc
@@ -46,8 +46,6 @@ npm start                      # node dist/index.js
 npm run test                   # Vitest unit tests
 npm run test:watch             # Watch mode
 npm run test:integration       # Integration tests (separate config)
-npm run lint                   # ESLint
-npm run typecheck              # tsc --noEmit
 ```
 
 ### Contracts (`contracts/`)
@@ -66,10 +64,19 @@ cargo build                    # Build
 cargo run                      # Dev server on port 8080
 cargo test                     # Tests
 ```
-Env vars: `LIFI_API_URL` (default: `https://li.quest/v1`), `LIFI_API_KEY`, `UX_ORIGIN_SETTLER`, `PORT` (default: 8080).
+Env vars: `LIFI_API_URL` (default: `https://li.quest/v1`), `LIFI_API_KEY`, `PORT` (default: 8080).
 
 ### Frontend (`frontend/`)
-See `frontend/CLAUDE.md` and `frontend/.context/` for commands and architecture.
+Currently in planning/documentation phase — no package.json or source code yet. See `frontend/CLAUDE.md`, `frontend/.context/`, and `frontend/docs/architecture/` for architecture and standards.
+```bash
+npx expo install                # Install dependencies (Expo-managed versions)
+npx expo start                  # Start dev server
+npx expo start --ios            # iOS simulator
+npx expo start --android        # Android emulator
+npm run lint                    # ESLint
+npm run test                    # Jest unit tests
+npx maestro test e2e/           # E2E tests
+```
 
 ## Architecture
 
@@ -96,10 +103,10 @@ See `frontend/CLAUDE.md` and `frontend/.context/` for commands and architecture.
 
 ### API Routes (Backend)
 - `/health` — GET
-- `/api/delegation` — POST /submit, POST /revoke, GET /status/:address
-- `/api/balance` — GET /:address, GET /:address/:asset
-- `/api/withdrawal` — POST /request, GET /status/:id, GET /history/:address
-- `/api/state` — GET /proof/:address, GET /sessions/:address
+- `/api/delegation` — POST /register, POST /revoke, GET /keys?userAddress=
+- `/api/balance` — GET ?userAddress=&asset=
+- `/api/withdrawal` — POST /request, GET /status/:id
+- `/api/state` — GET /channel/:channelId, GET /sessions?userAddress=
 
 ### lif-rust Endpoints
 `GET /health`, `POST /lifi/quote`, `POST /intent/build`, `POST /intent/calldata`
@@ -109,7 +116,7 @@ See `frontend/CLAUDE.md` and `frontend/.context/` for commands and architecture.
 - **LifiAdapter**: Wrapper for LiFi integration
 
 ### Database (Prisma/PostgreSQL)
-Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInventory`, `IntentLog`, `YieldLog`, `WithdrawalRequest`. Key enums: `SessionStatus`, `TransactionType`, `IntentStatus`, `WithdrawalStatus`, `ExitType`. Schema at `backend/prisma/schema.prisma`.
+Key models: `SessionKey`, `Session`, `Transaction`, `UserBalance`, `VaultInventory`, `IntentLog`, `YieldLog`, `WithdrawalRequest`. Key enums: `SessionStatus`, `SessionKeyStatus`, `TransactionType`, `IntentStatus`, `WithdrawalStatus`, `FulfillmentSource`. Schema at `backend/prisma/schema.prisma`.
 
 ## Development Phases
 
