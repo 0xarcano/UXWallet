@@ -4,12 +4,12 @@ pragma solidity ^0.8.33;
 import {Test} from "forge-std/Test.sol";
 import {MessageHashUtils} from "openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {UXOriginSettler} from "../src/UXOriginSettler.sol";
+import {IntentSettler} from "../src/intents/IntentSettler.sol";
 import {SessionKeyRegistry} from "../src/onboard/SessionKeyRegistry.sol";
-import {GaslessCrossChainOrder, OnchainCrossChainOrder, Output, ResolvedCrossChainOrder, FillInstruction} from "../src/erc7683/Structs.sol";
+import {GaslessCrossChainOrder, OnchainCrossChainOrder, Output, ResolvedCrossChainOrder, FillInstruction} from "../src/intents/erc7683/Structs.sol";
 
-contract UXOriginSettlerTest is Test {
-    UXOriginSettler private settler;
+contract IntentSettlerTest is Test {
+    IntentSettler private settler;
     SessionKeyRegistry private registry;
 
     uint256 private constant USER_PK = 0xA11CE;
@@ -18,13 +18,13 @@ contract UXOriginSettlerTest is Test {
     address private sessionKey = vm.addr(SESSION_PK);
 
     function setUp() public {
-        settler = new UXOriginSettler(address(this), address(0));
+        settler = new IntentSettler(address(this), address(0));
         registry = new SessionKeyRegistry();
         settler.setSessionKeyRegistry(address(registry));
     }
 
     function testOpenMarksNonce() public {
-        UXOriginSettler.UXDepositOrder memory uxOrder = _buildOrder(address(this));
+        IntentSettler.UXDepositOrder memory uxOrder = _buildOrder(address(this));
         OnchainCrossChainOrder memory order = OnchainCrossChainOrder({
             fillDeadline: uint32(block.timestamp + 1 days),
             orderDataType: settler.ORDER_DATA_TYPE(),
@@ -38,7 +38,7 @@ contract UXOriginSettlerTest is Test {
     }
 
     function testResolveBuildsFillInstructions() public view {
-        UXOriginSettler.UXDepositOrder memory uxOrder = _buildOrder(address(this));
+        IntentSettler.UXDepositOrder memory uxOrder = _buildOrder(address(this));
         OnchainCrossChainOrder memory order = OnchainCrossChainOrder({
             fillDeadline: uint32(block.timestamp + 2 days),
             orderDataType: settler.ORDER_DATA_TYPE(),
@@ -62,7 +62,7 @@ contract UXOriginSettlerTest is Test {
     function testOpenForAllowsSessionKeyWithinCap() public {
         _registerSessionKeyWithSig(user, USER_PK, sessionKey, address(0x1234), 4 ether);
 
-        UXOriginSettler.UXDepositOrder memory uxOrder = _buildOrder(user);
+        IntentSettler.UXDepositOrder memory uxOrder = _buildOrder(user);
         GaslessCrossChainOrder memory order = GaslessCrossChainOrder({
             originSettler: address(settler),
             user: user,
@@ -84,7 +84,7 @@ contract UXOriginSettlerTest is Test {
     function testOpenForRevertsWhenSessionKeyExceedsCap() public {
         _registerSessionKeyWithSig(user, USER_PK, sessionKey, address(0x1234), 2 ether);
 
-        UXOriginSettler.UXDepositOrder memory uxOrder = _buildOrder(user);
+        IntentSettler.UXDepositOrder memory uxOrder = _buildOrder(user);
         GaslessCrossChainOrder memory order = GaslessCrossChainOrder({
             originSettler: address(settler),
             user: user,
@@ -97,11 +97,11 @@ contract UXOriginSettlerTest is Test {
         });
 
         bytes memory signature = _signOrder(order, SESSION_PK);
-        vm.expectRevert(UXOriginSettler.SpendCapExceeded.selector);
+        vm.expectRevert(IntentSettler.SpendCapExceeded.selector);
         settler.openFor(order, signature, "");
     }
 
-    function _buildOrder(address userAddress) internal pure returns (UXOriginSettler.UXDepositOrder memory uxOrder) {
+    function _buildOrder(address userAddress) internal pure returns (IntentSettler.UXDepositOrder memory uxOrder) {
         Output[] memory outputs = new Output[](2);
         outputs[0] = Output({
             token: bytes32(uint256(uint160(address(0xBEEF)))),
@@ -120,7 +120,7 @@ contract UXOriginSettlerTest is Test {
         destinationCallData[0] = abi.encodePacked(uint8(1));
         destinationCallData[1] = abi.encodePacked(uint8(2));
 
-        uxOrder = UXOriginSettler.UXDepositOrder({
+        uxOrder = IntentSettler.UXDepositOrder({
             user: userAddress,
             inputToken: address(0x1234),
             inputAmount: 3 ether,
